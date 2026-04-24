@@ -1,6 +1,6 @@
 import type { ProviderId } from "../types";
 
-export const PROVIDER_IDS: ProviderId[] = ["aider", "claude", "cline", "codex", "cursor", "gemini", "opencode"];
+export const PROVIDER_IDS: ProviderId[] = ["aider", "claude", "cline", "codex", "cursor", "gemini", "kimi", "opencode"];
 export const DEFAULT_PROVIDER_ID: ProviderId = "claude";
 
 const PROVIDER_TRANSLATIONS: Record<
@@ -13,6 +13,7 @@ const PROVIDER_TRANSLATIONS: Record<
   codex: { key: "common.provider.codex", fallback: "Codex CLI" },
   cursor: { key: "common.provider.cursor", fallback: "Cursor" },
   gemini: { key: "common.provider.gemini", fallback: "Gemini CLI" },
+  kimi: { key: "common.provider.kimi", fallback: "Kimi CLI" },
   opencode: { key: "common.provider.opencode", fallback: "OpenCode" },
 };
 
@@ -32,6 +33,7 @@ const PROVIDER_ANALYTICS_CAPABILITIES: Record<
   codex: { supportsConversationBreakdown: false },
   cursor: { supportsConversationBreakdown: false },
   gemini: { supportsConversationBreakdown: false },
+  kimi: { supportsConversationBreakdown: false },
   opencode: { supportsConversationBreakdown: false },
 };
 
@@ -54,6 +56,7 @@ export function getProviderId(provider?: ProviderId | string): ProviderId {
     case "codex":
     case "cursor":
     case "gemini":
+    case "kimi":
     case "opencode":
     case "claude":
       return provider;
@@ -97,6 +100,7 @@ export const PROVIDER_BADGE_STYLES: Record<ProviderId, string> = {
   cline: "bg-teal-500/15 text-teal-600 dark:text-teal-400",
   cursor: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
   gemini: "bg-purple-500/15 text-purple-600 dark:text-purple-400",
+  kimi: "bg-orange-500/15 text-orange-600 dark:text-orange-400",
   opencode: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
   aider: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
 };

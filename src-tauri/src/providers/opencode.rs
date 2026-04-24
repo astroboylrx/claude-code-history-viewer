@@ -7,6 +7,7 @@ use serde_json::Value;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 
 /// Convert epoch milliseconds to RFC 3339 string
 fn epoch_ms_to_rfc3339(ms: u64) -> String {
@@ -17,6 +18,16 @@ fn epoch_ms_to_rfc3339(ms: u64) -> String {
         Some(dt) => dt.to_rfc3339(),
         None => String::new(),
     }
+}
+
+/// Encode a directory path into a safe string for project IDs
+fn encode_dir_for_path(directory: &str) -> String {
+    directory.replace("/", "_SLASH_").replace("~", "_TILDE_")
+}
+
+/// Decode a directory path from its encoded form
+fn decode_dir_from_path(encoded: &str) -> String {
+    encoded.replace("_SLASH_", "/").replace("_TILDE_", "~")
 }
 
 /// Detect `OpenCode` installation
@@ -82,33 +93,74 @@ pub fn scan_projects_from_path(base_path: &str) -> Result<Vec<ClaudeProject>, St
     let db_sessions_by_project: std::collections::HashMap<String, HashSet<String>> =
         build_db_session_map(base_path).unwrap_or_default();
 
-    // 1. Read from SQLite (preferred, newer source)
-    if let Some(db_projects) = scan_projects_from_db(base_path) {
-        for mut p in db_projects {
-            let id = p
-                .path
-                .strip_prefix("opencode://")
-                .unwrap_or(&p.path)
-                .to_string();
-            if !is_safe_storage_id(&id) {
-                continue;
+    // 1. Group sessions by worktree directory from SQLite
+    let mut dir_sessions: HashMap<String, Vec<(String, String, u64, u64)>> = HashMap::new();
+    if let Some(conn) = open_db(base_path) {
+        let mut stmt = conn
+            .prepare(
+                "SELECT s.id, s.directory, s.title, s.time_created, s.time_updated
+                 FROM session s
+                 WHERE s.project_id = 'global'",
+            )
+            .ok();
+        if let Some(ref mut s) = stmt {
+            let rows = s.query_map([], |row| {
+                let session_id: String = row.get(0)?;
+                let directory: String = row.get(1)?;
+                let title: String = row.get(2)?;
+                let time_created: u64 = row.get(3)?;
+                let time_updated: u64 = row.get(4)?;
+                Ok((session_id, directory, title, time_created, time_updated))
+            });
+            if let Ok(rows) = rows {
+                for row in rows.flatten() {
+                    let (session_id, directory, title, time_created, time_updated) = row;
+                    if directory.is_empty() {
+                        continue;
+                    }
+                    dir_sessions
+                        .entry(directory.clone())
+                        .or_default()
+                        .push((session_id, title, time_created, time_updated));
+                }
             }
-            // Supplement session count with JSON-only sessions
-            let sessions_dir = storage_path.join("session").join(&id);
-            if is_non_symlink_dir(&sessions_dir) {
-                let db_ids = db_sessions_by_project.get(&id);
-                let json_only = count_json_sessions_excluding(
-                    &sessions_dir,
-                    db_ids.map(|s| s as &HashSet<String>),
-                );
-                p.session_count += json_only;
-            }
-            seen_ids.insert(id);
-            projects.push(p);
         }
     }
 
-    // 2. Read from JSON files (fallback / merge)
+    // Create one project per unique worktree directory
+    for (directory, sessions) in &dir_sessions {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let display_path = if directory.starts_with(&home) && !home.is_empty() {
+            format!("~{}", &directory[home.len()..])
+        } else {
+            directory.clone()
+        };
+
+        let last_modified = sessions
+            .iter()
+            .map(|(_, _, _, t)| *t)
+            .max()
+            .unwrap_or(0);
+        let last_modified_str = epoch_ms_to_rfc3339(last_modified);
+
+        let project_id = format!("by_dir/{}", encode_dir_for_path(directory));
+
+        projects.push(ClaudeProject {
+            name: display_path.clone(),
+            path: format!("opencode://{project_id}"),
+            actual_path: directory.clone(),
+            session_count: sessions.len(),
+            message_count: 0,
+            last_modified: last_modified_str,
+            git_info: None,
+            provider: Some("opencode".to_string()),
+            storage_type: Some("sqlite".to_string()),
+            custom_directory_label: None,
+        });
+        seen_ids.insert("global".to_string());
+    }
+
+    // 2. Read non-global projects from JSON files (fallback / additional)
     let projects_dir = storage_path.join("project");
     if is_non_symlink_dir(&projects_dir) {
         let entries = fs::read_dir(&projects_dir).map_err(|e| e.to_string())?;
@@ -142,8 +194,13 @@ pub fn scan_projects_from_path(base_path: &str) -> Result<Vec<ClaudeProject>, St
                 continue;
             }
 
-            // Skip if already loaded from SQLite
+            // Skip if already loaded from SQLite (including 'global' which is now split by directory)
             if seen_ids.contains(&project_id) {
+                continue;
+            }
+
+            // Skip 'global' since we handle it via directory-based projects
+            if project_id == "global" {
                 continue;
             }
 
@@ -214,10 +271,24 @@ pub fn load_sessions(
     let base_path = get_base_path().ok_or_else(|| "OpenCode not found".to_string())?;
     let storage_path = Path::new(&base_path).join("storage");
 
-    let project_id = project_path
+    let path_part = project_path
         .strip_prefix("opencode://")
         .unwrap_or(project_path);
-    if !is_safe_storage_id(project_id) {
+
+    // Check if this is a directory-based project (format: "by_dir/{encoded_dir}")
+    if let Some(encoded_dir) = path_part.strip_prefix("by_dir/") {
+        let directory = decode_dir_from_path(encoded_dir);
+        if !directory.is_empty() {
+            if let Some(sessions) = load_sessions_from_db_by_dir(&base_path, &directory) {
+                return Ok(sessions);
+            }
+        }
+        return Ok(Vec::new());
+    }
+
+    // Original logic for regular project IDs
+    let project_id = path_part;
+    if !is_safe_storage_id(project_id) && !project_id.starts_with("by_dir/") {
         return Err(format!("Invalid OpenCode project path: {project_path}"));
     }
 
@@ -747,6 +818,55 @@ fn load_sessions_from_db(base_path: &str, project_id: &str) -> Option<Vec<Claude
                 session_id: format!("opencode://{session_id}"),
                 actual_session_id: session_id.clone(),
                 file_path: format!("opencode://{project_id}/{session_id}"),
+                project_name: String::new(),
+                message_count,
+                first_message_time: created_at.clone(),
+                last_message_time: updated_at.clone(),
+                last_modified: updated_at,
+                has_tool_use: false,
+                has_errors: false,
+                summary: if title.is_empty() { None } else { Some(title) },
+                is_renamed: false,
+                provider: Some("opencode".to_string()),
+                storage_type: Some("sqlite".to_string()),
+            })
+        })
+        .ok()?;
+
+    let sessions: Vec<ClaudeSession> = rows.filter_map(std::result::Result::ok).collect();
+    if sessions.is_empty() {
+        None
+    } else {
+        Some(sessions)
+    }
+}
+
+fn load_sessions_from_db_by_dir(base_path: &str, directory: &str) -> Option<Vec<ClaudeSession>> {
+    let conn = open_db(base_path)?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT s.id, s.title, s.time_created, s.time_updated,
+                    (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) AS message_count
+             FROM session s
+             WHERE s.project_id = 'global' AND s.directory = ?1",
+        )
+        .ok()?;
+
+    let rows = stmt
+        .query_map([directory], |row| {
+            let session_id: String = row.get(0)?;
+            let title: String = row.get(1)?;
+            let time_created: u64 = row.get(2)?;
+            let time_updated: u64 = row.get(3)?;
+            let message_count: usize = row.get(4)?;
+
+            let created_at = epoch_ms_to_rfc3339(time_created);
+            let updated_at = epoch_ms_to_rfc3339(time_updated);
+
+            Ok(ClaudeSession {
+                session_id: format!("opencode://{session_id}"),
+                actual_session_id: session_id.clone(),
+                file_path: format!("opencode://dir_global/{session_id}"),
                 project_name: String::new(),
                 message_count,
                 first_message_time: created_at.clone(),
