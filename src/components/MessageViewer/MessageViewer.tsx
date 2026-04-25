@@ -579,14 +579,13 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
 
   return (
     <div className="relative flex-1 h-full flex flex-col">
-      {/* Search Toolbar - Editorial aesthetic */}
+      {/* Search Toolbar */}
       <div
         role="search"
         className={cn(
           "flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2 lg:py-2.5 border-b sticky top-0 z-10",
           "flex-wrap",
-          "bg-gradient-to-r from-zinc-900/95 via-zinc-800/95 to-zinc-900/95",
-          "backdrop-blur-sm border-zinc-700/50"
+          "bg-muted/50 backdrop-blur-sm border-border"
         )}
       >
         {/* Back Button */}
@@ -596,8 +595,8 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
             onClick={onBack}
             className={cn(
               "shrink-0 p-2 rounded-lg transition-all duration-200",
-              "bg-zinc-800/60 hover:bg-zinc-700/80 text-zinc-400 hover:text-zinc-100",
-              "border border-zinc-700/40 hover:border-zinc-600/50"
+              "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground",
+              "border border-border hover:border-border"
             )}
             title={t("common.back")}
           >
@@ -606,15 +605,15 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
         )}
 
         {/* Filter Toggle - Segmented control style */}
-        <div className="shrink-0 flex items-center bg-zinc-800/60 rounded-lg p-0.5 border border-zinc-700/40 order-2 lg:order-none">
+        <div className="shrink-0 flex items-center bg-muted rounded-lg p-0.5 border border-border order-2 lg:order-none">
           <button
             type="button"
             onClick={() => onFilterTypeChange("content")}
             className={cn(
               "text-xs px-2.5 py-1 rounded-md transition-all duration-200 whitespace-nowrap",
               sessionSearch.filterType === "content"
-                ? "bg-zinc-600/80 text-zinc-100 shadow-sm"
-                : "text-zinc-400 hover:text-zinc-200"
+                ? "bg-foreground/10 text-foreground font-medium"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
             title={t("messageViewer.filterType")}
           >
@@ -626,8 +625,8 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
             className={cn(
               "text-xs px-2.5 py-1 rounded-md transition-all duration-200 whitespace-nowrap",
               sessionSearch.filterType === "toolId"
-                ? "bg-zinc-600/80 text-zinc-100 shadow-sm"
-                : "text-zinc-400 hover:text-zinc-200"
+                ? "bg-foreground/10 text-foreground font-medium"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
             title={t("messageViewer.filterType")}
           >
@@ -635,11 +634,11 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
           </button>
         </div>
 
-        {/* Search Input - Glass morphism */}
+        {/* Search Input */}
         <div className="relative flex-1 group order-1 lg:order-none w-full lg:w-auto">
           <Search className={cn(
             "absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4",
-            "text-zinc-500 group-focus-within:text-zinc-300 transition-colors"
+            "text-muted-foreground group-focus-within:text-foreground transition-colors"
           )} />
           <input
             ref={searchInputRef}
@@ -651,9 +650,9 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
             aria-label={t("messageViewer.searchPlaceholder")}
             className={cn(
               "w-full pl-9 pr-9 py-2 rounded-lg text-sm",
-              "bg-zinc-800/50 border border-zinc-700/50",
-              "text-zinc-100 placeholder:text-zinc-500",
-              "focus:outline-none focus:ring-1 focus:ring-zinc-500/50 focus:border-zinc-500/70",
+              "bg-background border border-border",
+              "text-foreground placeholder:text-muted-foreground",
+              "focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring",
               "transition-all duration-200"
             )}
           />
@@ -669,8 +668,8 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
                 aria-label="Clear search"
                 className={cn(
                   "absolute right-2.5 top-1/2 transform -translate-y-1/2",
-                  "p-1 rounded-md text-zinc-500",
-                  "hover:bg-zinc-700/50 hover:text-zinc-300",
+                  "p-1 rounded-md text-muted-foreground",
+                  "hover:bg-muted hover:text-foreground",
                   "transition-all duration-150"
                 )}
               >
@@ -683,10 +682,10 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
         {/* Match Navigation - Enhanced touch targets */}
         {sessionSearch.query && sessionSearch.matches && sessionSearch.matches.length > 0 && (
           <div className="shrink-0 flex items-center gap-1.5 order-3 lg:order-none">
-            <span className="whitespace-nowrap text-xs font-mono tabular-nums text-zinc-300 bg-zinc-700/50 px-2 py-1 rounded-md border border-zinc-600/30">
+            <span className="whitespace-nowrap text-xs font-mono tabular-nums text-foreground bg-muted px-2 py-1 rounded-md border border-border">
               {sessionSearch.currentMatchIndex + 1}/{sessionSearch.matches.length}
             </span>
-            <div className="flex items-center gap-0.5 bg-zinc-800/60 rounded-lg p-0.5 border border-zinc-700/40">
+            <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5 border border-border">
               <button
                 type="button"
                 onClick={onPrevMatch}
@@ -695,7 +694,7 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
                 title="Shift+Enter"
                 className={cn(
                   "p-1.5 rounded-md transition-all duration-150",
-                  "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/60",
+                  "text-muted-foreground hover:text-foreground hover:bg-muted/80",
                   "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 )}
               >
@@ -709,7 +708,7 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
                 title="Enter"
                 className={cn(
                   "p-1.5 rounded-md transition-all duration-150",
-                  "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/60",
+                  "text-muted-foreground hover:text-foreground hover:bg-muted/80",
                   "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 )}
               >
@@ -728,9 +727,8 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
               className={cn(
                 "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap",
                 "transition-all duration-200",
-                "bg-zinc-700/60 hover:bg-zinc-600/70",
-                "text-zinc-300 hover:text-zinc-100",
-                "border border-zinc-600/50 hover:border-zinc-500/50",
+                "bg-muted hover:bg-muted/80 text-foreground",
+                "border border-border hover:border-border",
                 "shadow-sm hover:shadow-md"
               )}
               title={t("captureMode.tooltip")}
@@ -748,9 +746,8 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
                   className={cn(
                     "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap",
                     "transition-all duration-200",
-                    "bg-zinc-700/60 hover:bg-zinc-600/70",
-                    "text-zinc-300 hover:text-zinc-100",
-                    "border border-zinc-600/50 hover:border-zinc-500/50",
+                    "bg-muted hover:bg-muted/80 text-foreground",
+                    "border border-border hover:border-border",
                     "shadow-sm hover:shadow-md",
                     "disabled:opacity-50 disabled:cursor-not-allowed"
                   )}
