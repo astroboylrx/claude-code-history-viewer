@@ -39,10 +39,14 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   }, []);
 
   const initializeTheme = useCallback(async () => {
-    const savedTheme = await loadThemeFromTauriStore();
-    if (savedTheme) {
-      setTheme(savedTheme);
-      setIsDarkMode(calculateIsDarkMode(savedTheme));
+    try {
+      const savedTheme = await loadThemeFromTauriStore();
+      if (savedTheme) {
+        setTheme(savedTheme);
+        setIsDarkMode(calculateIsDarkMode(savedTheme));
+      }
+    } catch (error) {
+      console.error("Failed to load theme from store:", error);
     }
   }, []);
 
