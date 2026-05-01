@@ -1,4 +1,4 @@
-use crate::models::{ClaudeMessage, ClaudeProject, ClaudeSession};
+use crate::models::{ClaudeMessage, ClaudeProject, ClaudeSession, TokenUsage};
 use crate::providers::ProviderInfo;
 use crate::utils::build_provider_message;
 use serde_json::Value;
@@ -194,6 +194,7 @@ pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
         .to_string();
 
     let session_dir = wire_path.parent().and_then(|p| p.parent());
+    let wire_dir = wire_path.parent();
     let _project_name = session_dir
         .and_then(get_project_name_from_state)
         .unwrap_or_else(|| {
@@ -206,6 +207,8 @@ pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
 
     let mut messages = Vec::new();
     let mut counter = 0u64;
+    let mut assistant_msg_indices_per_turn: Vec<Vec<usize>> = Vec::new();
+    let mut current_turn_assistant: Vec<usize> = Vec::new();
 
     for line in data.lines() {
         let trimmed = line.trim();
@@ -228,6 +231,10 @@ pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
             Some("TurnBegin" | "StepBegin" | "TurnEnd" | "StepEnd") => {
                 // These are event markers, create a message for important ones
                 if msg_type == Some("TurnBegin") {
+                    if !current_turn_assistant.is_empty() {
+                        assistant_msg_indices_per_turn.push(current_turn_assistant.clone());
+                        current_turn_assistant.clear();
+                    }
                     let timestamp = raw.get("timestamp").and_then(Value::as_f64);
                     counter += 1;
                     let uuid = format!("kimi-{counter}");
@@ -315,6 +322,7 @@ pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
                     Some(content),
                     None,
                 ));
+                current_turn_assistant.push(messages.len() - 1);
             }
             Some("ToolResult") => {
                 let timestamp = raw.get("timestamp").and_then(Value::as_f64);
@@ -412,6 +420,7 @@ pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
                                 Some(content),
                                 None,
                             ));
+                            current_turn_assistant.push(messages.len() - 1);
                         }
                     }
                     Some("text") => {
@@ -435,12 +444,45 @@ pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
                                 Some(content),
                                 None,
                             ));
+                            current_turn_assistant.push(messages.len() - 1);
                         }
                     }
                     _ => {}
                 }
             }
             _ => {}
+        }
+    }
+
+    if !current_turn_assistant.is_empty() {
+        assistant_msg_indices_per_turn.push(current_turn_assistant);
+    }
+
+    let total_tokens = wire_dir
+        .map(|d| read_total_tokens(d))
+        .unwrap_or(0);
+    if total_tokens > 0 && !assistant_msg_indices_per_turn.is_empty() {
+        let per_turn = total_tokens / assistant_msg_indices_per_turn.len() as u64;
+        if per_turn > 0 {
+            for msg_indices in &assistant_msg_indices_per_turn {
+                if let Some(&last_idx) = msg_indices.last() {
+                    if let Some(msg) = messages.get_mut(last_idx) {
+                        msg.usage = Some(TokenUsage {
+                            input_tokens: Some(per_turn as u32),
+                            output_tokens: Some(0),
+                            cache_creation_input_tokens: None,
+                            cache_read_input_tokens: None,
+                            service_tier: None,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    for msg in &mut messages {
+        if msg.role.as_deref() == Some("assistant") && msg.model.is_none() {
+            msg.model = Some("kimi-for-coding".to_string());
         }
     }
 
@@ -557,6 +599,40 @@ pub fn search(query: &str, limit: usize) -> Result<Vec<ClaudeMessage>, String> {
 // ============================================================================
 // Private helpers
 // ============================================================================
+
+/// Read total cumulative token count from the last `_usage` entry in context.jsonl.
+fn read_total_tokens(session_dir: &Path) -> u64 {
+    let context_paths = [
+        session_dir.join("context.jsonl"),
+        session_dir.join("context_1.jsonl"),
+    ];
+
+    let ctx_path = match context_paths.iter().find(|p| p.is_file()) {
+        Some(p) => p,
+        None => return 0,
+    };
+
+    let data = match fs::read_to_string(ctx_path) {
+        Ok(d) => d,
+        Err(_) => return 0,
+    };
+
+    let mut max_tokens = 0u64;
+    for line in data.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Ok(obj) = serde_json::from_str::<Value>(trimmed) {
+            if obj.get("role").and_then(Value::as_str) == Some("_usage") {
+                if let Some(count) = obj.get("token_count").and_then(Value::as_u64) {
+                    max_tokens = max_tokens.max(count);
+                }
+            }
+        }
+    }
+    max_tokens
+}
 
 fn get_project_name_from_state(session_dir: &Path) -> Option<String> {
     let context_paths = [

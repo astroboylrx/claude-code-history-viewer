@@ -174,9 +174,17 @@ pub async fn scan_projects(claude_path: String) -> Result<Vec<ClaudeProject>, St
         .filter_map(std::result::Result::ok)
         .filter(|e| e.file_type().is_dir())
     {
-        let raw_project_name = entry.file_name().to_string_lossy().to_string();
         let project_path = entry.path().to_string_lossy().to_string();
-        let project_name = extract_project_name(&raw_project_name);
+
+        // Decode the actual filesystem path FIRST (needed for display name and git info)
+        let actual_path = crate::utils::decode_project_path(&project_path);
+
+        let home = std::env::var("HOME").unwrap_or_default();
+        let project_name = if actual_path.starts_with(&home) && !home.is_empty() {
+            format!("~{}", &actual_path[home.len()..])
+        } else {
+            actual_path.clone()
+        };
 
         let mut session_count = 0;
         let mut message_count = 0;
@@ -221,9 +229,6 @@ pub async fn scan_projects(claude_path: String) -> Result<Vec<ClaudeProject>, St
             eprintln!("⚠️ Skipping non-absolute project path: {project_path}");
             continue;
         }
-
-        // Decode the actual filesystem path FIRST
-        let actual_path = crate::utils::decode_project_path(&project_path);
 
         // Detect git worktree information using the actual filesystem path
         let git_info = detect_git_worktree_info(&actual_path);

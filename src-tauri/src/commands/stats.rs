@@ -1365,6 +1365,7 @@ fn get_provider_project_stats_summary(
     let mut tool_usage_map: HashMap<String, (u32, u32)> = HashMap::new();
     let mut daily_stats_map: HashMap<String, DailyStats> = HashMap::new();
     let mut activity_map: HashMap<(u8, u8), (u32, u64)> = HashMap::new();
+    let mut model_usage_map: HashMap<String, (u32, u64, u64, u64, u64, u64)> = HashMap::new();
 
     for session in &sessions {
         let messages = load_provider_messages_for_stats(provider, session)?;
@@ -1407,6 +1408,18 @@ fn get_provider_project_stats_summary(
             summary.token_distribution.output += output_tokens;
             summary.token_distribution.cache_creation += cache_creation_tokens;
             summary.token_distribution.cache_read += cache_read_tokens;
+
+            if let Some(ref model_name) = message.model {
+                let model_entry = model_usage_map
+                    .entry(model_name.clone())
+                    .or_insert((0, 0, 0, 0, 0, 0));
+                model_entry.0 += 1;
+                model_entry.1 += total_tokens;
+                model_entry.2 += input_tokens;
+                model_entry.3 += output_tokens;
+                model_entry.4 += cache_creation_tokens;
+                model_entry.5 += cache_read_tokens;
+            }
 
             if let Some(timestamp) = parsed_ts {
                 parsed_timestamps.push(timestamp);
@@ -1499,6 +1512,27 @@ fn get_provider_project_stats_summary(
         .iter()
         .max_by_key(|a| a.activity_count)
         .map_or(0, |a| a.hour);
+
+    summary.model_distribution = model_usage_map
+        .into_iter()
+        .map(
+            |(
+                model_name,
+                (message_count, token_count, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens),
+            )| ModelStats {
+                model_name,
+                message_count,
+                token_count,
+                input_tokens,
+                output_tokens,
+                cache_creation_tokens,
+                cache_read_tokens,
+            },
+        )
+        .collect();
+    summary
+        .model_distribution
+        .sort_by(|a, b| b.token_count.cmp(&a.token_count));
 
     Ok(summary)
 }

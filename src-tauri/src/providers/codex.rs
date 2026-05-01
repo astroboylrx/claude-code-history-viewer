@@ -164,10 +164,12 @@ pub fn scan_projects_from_path(base_path: &str) -> Result<Vec<ClaudeProject>, St
     let mut projects: Vec<ClaudeProject> = project_map
         .into_iter()
         .map(|(cwd, sessions)| {
-            let name = Path::new(&cwd)
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| cwd.clone());
+            let home = std::env::var("HOME").unwrap_or_default();
+            let name = if cwd.starts_with(&home) && !home.is_empty() {
+                format!("~{}", &cwd[home.len()..])
+            } else {
+                cwd.clone()
+            };
 
             let session_count = sessions.len();
             let message_count: usize = sessions.iter().map(|s| s.message_count).sum();

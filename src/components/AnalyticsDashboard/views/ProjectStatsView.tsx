@@ -20,7 +20,7 @@ import {
   TokenDistributionChart,
 } from "../components";
 import { formatNumber, formatCurrency, generateTrendData, extractProjectGrowth } from "../utils";
-import { calculateGlobalCostSummary } from "../utils/globalCalculations";
+import { calculateGlobalCostSummary, calculateModelMetrics } from "../utils/globalCalculations";
 import { supportsConversationBreakdown } from "../../../utils/providers";
 
 interface ProjectStatsViewProps {
@@ -170,13 +170,61 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
         </SectionCard>
       )}
 
-      {/* Token Distribution */}
-      <SectionCard title={t("analytics.tokenTypeDistribution")} icon={Database} colorVariant="amber">
-        <TokenDistributionChart
-          distribution={projectSummary.token_distribution}
-          total={projectSummary.total_tokens}
-        />
-      </SectionCard>
+      {/* Token Distribution + Model Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <SectionCard title={t("analytics.tokenTypeDistribution")} icon={Database} colorVariant="amber">
+          <TokenDistributionChart
+            distribution={projectSummary.token_distribution}
+            total={projectSummary.total_tokens}
+          />
+        </SectionCard>
+
+        {projectSummary.model_distribution.length > 0 && (
+          <SectionCard title={t("analytics.modelDistribution")} icon={Cpu} colorVariant="blue">
+            <div className="space-y-3">
+              {projectSummary.model_distribution.map((model) => {
+                const { percentage, formattedPrice, formattedTokens } = calculateModelMetrics(
+                  model.model_name,
+                  model.token_count,
+                  model.input_tokens,
+                  model.output_tokens,
+                  model.cache_creation_tokens,
+                  model.cache_read_tokens,
+                  projectSummary.total_tokens
+                );
+
+                return (
+                  <div key={model.model_name}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="block max-w-[60%] text-[12px] font-medium text-foreground truncate">
+                        {model.model_name}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[12px] text-muted-foreground">
+                          {formattedPrice}
+                        </span>
+                        <span className="font-mono text-[12px] font-semibold text-foreground">
+                          {formattedTokens}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${percentage}%`,
+                          background:
+                            "linear-gradient(90deg, var(--metric-purple), var(--metric-blue))",
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </SectionCard>
+        )}
+      </div>
       </>)}
     </div>
   );
