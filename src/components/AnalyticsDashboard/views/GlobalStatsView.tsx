@@ -95,7 +95,7 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
   }, [globalSummary.date_range.last_message, t]);
 
   return (
-    <div className="flex-1 p-3 md:p-6 overflow-auto bg-background space-y-4 md:space-y-6 animate-stagger">
+    <div className="flex-1 p-3 md:p-6 overflow-auto bg-background space-y-4 md:space-y-6">
       <p className="text-[11px] text-muted-foreground">
         {t(
           "analytics.providerScopeProjectTree",

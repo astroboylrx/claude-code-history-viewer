@@ -36,6 +36,7 @@ export interface AnalyticsSliceActions {
   setAnalyticsMetricMode: (mode: MetricMode) => void;
   setAnalyticsProjectSummary: (summary: ProjectStatsSummary | null) => void;
   setAnalyticsProjectConversationSummary: (summary: ProjectStatsSummary | null) => void;
+  setAnalyticsProjectSummaries: (billing: ProjectStatsSummary | null, conversation: ProjectStatsSummary | null) => void;
   setAnalyticsSessionComparison: (comparison: SessionComparison | null) => void;
   setAnalyticsLoadingProjectSummary: (loading: boolean) => void;
   setAnalyticsLoadingSessionComparison: (loading: boolean) => void;
@@ -114,6 +115,16 @@ export const createAnalyticsSlice: StateCreator<
       analytics: {
         ...state.analytics,
         projectConversationSummary: summary,
+      },
+    }));
+  },
+
+  setAnalyticsProjectSummaries: (billing: ProjectStatsSummary | null, conversation: ProjectStatsSummary | null) => {
+    set((state) => ({
+      analytics: {
+        ...state.analytics,
+        projectSummary: billing,
+        projectConversationSummary: conversation,
       },
     }));
   },

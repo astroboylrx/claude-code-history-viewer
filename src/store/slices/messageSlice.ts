@@ -602,39 +602,42 @@ export const createMessageSlice: StateCreator<
     }
   },
 
-  loadProjectStatsSummary: async (projectPath: string) => {
-    try {
-      const dateOptions = normalizeDateFilterOptions(get().dateFilter);
+   loadProjectStatsSummary: async (projectPath: string) => {
+     try {
+       const dateOptions = normalizeDateFilterOptions(get().dateFilter);
 
-      const billing = await fetchProjectStatsSummary(projectPath, {
-        ...dateOptions,
-        stats_mode: "billing_total",
-      });
-      const conversation = canLoadConversationBreakdown()
-        ? await fetchProjectStatsSummary(projectPath, {
-            ...dateOptions,
-            stats_mode: "conversation_only",
-          }).catch((error) => {
-            console.warn(
-              "Failed to load conversation-only project summary:",
-              error
-            );
-            toast.warning(
-              "Conversation-only project summary could not be loaded. Showing billing totals only."
-            );
-            return billing;
-          })
-        : billing;
-      get().setAnalyticsProjectConversationSummary(conversation);
-      return billing;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error("Failed to load project stats summary:", error);
-      toast.error(`Failed to load project stats summary: ${message}`);
-      get().setError({ type: AppErrorType.UNKNOWN, message: String(error) });
-      throw error;
-    }
-  },
+       const billingPromise = fetchProjectStatsSummary(projectPath, {
+         ...dateOptions,
+         stats_mode: "billing_total",
+       });
+
+       const hasBreakdown = canLoadConversationBreakdown();
+       const conversationPromise = hasBreakdown
+         ? fetchProjectStatsSummary(projectPath, {
+             ...dateOptions,
+             stats_mode: "conversation_only",
+           }).catch((error) => {
+             console.warn("Failed to load conversation-only project summary:", error);
+             toast.warning("Conversation-only project summary could not be loaded. Showing billing totals only.");
+             return null;
+           })
+         : Promise.resolve(null);
+
+       const [billing, conversationRaw] = await Promise.all([
+         billingPromise,
+         conversationPromise,
+       ]);
+
+       const conversation = conversationRaw ?? billing;
+       return { billing, conversation };
+     } catch (error) {
+       const message = error instanceof Error ? error.message : String(error);
+       console.error("Failed to load project stats summary:", error);
+       toast.error(`Failed to load project stats summary: ${message}`);
+       get().setError({ type: AppErrorType.UNKNOWN, message: String(error) });
+       throw error;
+     }
+   },
 
   loadSessionComparison: async (sessionId: string, projectPath: string) => {
     const dateOptions = normalizeDateFilterOptions(get().dateFilter);

@@ -16,6 +16,7 @@ import { LoadingSpinner } from "@/components/ui/loading";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ProjectTree } from "@/components/ProjectTree";
+import { useAppStore } from "@/store/useAppStore";
 import { MessageViewer } from "@/components/MessageViewer";
 import { MessageNavigator } from "@/components/MessageNavigator";
 import { TokenStatsViewer } from "@/components/TokenStatsViewer";
@@ -50,7 +51,6 @@ import type { ProjectTokenStatsPagination } from "@/store/slices/messageSlice";
 export interface AppLayoutProps {
   // Store state
   projects: ClaudeProject[];
-  sessions: ClaudeSession[];
   selectedProject: ClaudeProject | null;
   selectedSession: ClaudeSession | null;
   messages: ClaudeMessage[];
@@ -135,9 +135,9 @@ export interface AppLayoutProps {
 
 export const AppLayout: React.FC<AppLayoutProps> = (props) => {
   const { t } = useTranslation();
+  const sessions = useAppStore((state) => state.sessions);
   const {
     projects,
-    sessions,
     selectedProject,
     selectedSession,
     messages,
@@ -292,7 +292,6 @@ export const AppLayout: React.FC<AppLayoutProps> = (props) => {
               </SheetTitle>
               <ProjectTree
                 projects={projects}
-                sessions={sessions}
                 selectedProject={selectedProject}
                 selectedSession={selectedSession}
                 onProjectSelect={handleProjectSelect}
@@ -323,7 +322,6 @@ export const AppLayout: React.FC<AppLayoutProps> = (props) => {
             <div className="hidden md:block">
               <ProjectTree
                 projects={projects}
-                sessions={sessions}
                 selectedProject={selectedProject}
                 selectedSession={selectedSession}
                 onProjectSelect={handleProjectSelect}
@@ -511,19 +509,11 @@ export const AppLayout: React.FC<AppLayoutProps> = (props) => {
                   />
                 </OverlayScrollbarsComponent>
               ) : computed.isAnalyticsView || isViewingGlobalStats ? (
-                <OverlayScrollbarsComponent
-                  className="h-full"
-                  options={{
-                    scrollbars: {
-                      theme: "os-theme-custom",
-                      autoHide: "leave",
-                    },
-                  }}
-                >
+                <div className="h-full overflow-auto os-theme-custom">
                   <AnalyticsDashboard
                     isViewingGlobalStats={isViewingGlobalStats}
                   />
-                </OverlayScrollbarsComponent>
+                </div>
               ) : computed.isTokenStatsView ? (
                 <OverlayScrollbarsComponent
                   className="h-full"

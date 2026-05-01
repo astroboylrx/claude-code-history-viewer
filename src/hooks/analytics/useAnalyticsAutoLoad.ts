@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, startTransition } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useAppStore } from "../../store/useAppStore";
@@ -27,6 +27,7 @@ export function useAnalyticsAutoLoad(computed: {
     sessionTokenStats,
     dateFilter,
     setAnalyticsProjectSummary,
+    setAnalyticsProjectSummaries,
     setAnalyticsSessionComparison,
     setAnalyticsLoadingProjectSummary,
     setAnalyticsLoadingSessionComparison,
@@ -228,17 +229,20 @@ export function useAnalyticsAutoLoad(computed: {
             return;
           }
         } else if (computed.isAnalyticsView) {
-          setAnalyticsLoadingProjectSummary(true);
-          const summary = await loadProjectStatsSummary(
+          const { billing, conversation } = await loadProjectStatsSummary(
             selectedProjectPath
           );
           if (isStaleRequest()) {
             return;
           }
-          setAnalyticsProjectSummary(summary);
+          startTransition(() => {
+            setAnalyticsProjectSummaries(billing, conversation);
+          });
 
           if (selectedSessionId && selectedSessionFilePath) {
-            setAnalyticsLoadingSessionComparison(true);
+            startTransition(() => {
+              setAnalyticsLoadingSessionComparison(true);
+            });
             try {
               const [comparison] = await Promise.all([
                 loadSessionComparison(
@@ -250,8 +254,10 @@ export function useAnalyticsAutoLoad(computed: {
               if (isStaleRequest()) {
                 return;
               }
-              setAnalyticsSessionComparison(comparison);
-              setAnalyticsSessionComparisonError(null);
+              startTransition(() => {
+                setAnalyticsSessionComparison(comparison);
+                setAnalyticsSessionComparisonError(null);
+              });
             } catch (err) {
               if (isStaleRequest()) {
                 return;
@@ -260,14 +266,20 @@ export function useAnalyticsAutoLoad(computed: {
                 err instanceof Error
                   ? err.message
                   : t("common.hooks.sessionComparisonLoadFailed");
-              setAnalyticsSessionComparison(null);
-              setAnalyticsSessionComparisonError(message);
+              startTransition(() => {
+                setAnalyticsSessionComparison(null);
+                setAnalyticsSessionComparisonError(message);
+              });
             } finally {
-              setAnalyticsLoadingSessionComparison(false);
+              startTransition(() => {
+                setAnalyticsLoadingSessionComparison(false);
+              });
             }
           } else {
-            setAnalyticsSessionComparison(null);
-            setAnalyticsSessionComparisonError(null);
+            startTransition(() => {
+              setAnalyticsSessionComparison(null);
+              setAnalyticsSessionComparisonError(null);
+            });
           }
         }
       } catch (err) {
@@ -278,12 +290,12 @@ export function useAnalyticsAutoLoad(computed: {
           err instanceof Error
             ? err.message
             : t("common.hooks.projectSummaryLoadFailed");
-        setAnalyticsProjectSummaryError(message);
+        startTransition(() => {
+          setAnalyticsProjectSummaryError(message);
+        });
         toast.error(message);
       } finally {
-        if (computed.isAnalyticsView) {
-          setAnalyticsLoadingProjectSummary(false);
-        }
+        // Loading state removed - ProjectStatsView shows loading based on null projectSummary
       }
     };
 

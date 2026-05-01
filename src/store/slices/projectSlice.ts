@@ -262,12 +262,13 @@ export const createProjectSlice: StateCreator<
   },
 
   selectProject: async (project: ClaudeProject) => {
+    
     set({
       selectedProject: project,
-      sessions: [],
       selectedSession: null,
       isLoadingSessions: true,
     });
+    
     try {
       const provider = project.provider ?? "claude";
       const sessions = provider !== "claude"
@@ -280,10 +281,9 @@ export const createProjectSlice: StateCreator<
             projectPath: project.path,
             excludeSidechain: get().excludeSidechain,
           });
-      set({ sessions });
-
-      // Update project's session_count to match actual loaded sessions
-      // (scan_projects counts files, but load_sessions filters invalid ones)
+      
+      set({ sessions, isLoadingSessions: false });
+      
       if (sessions.length !== project.session_count) {
         const projects = get().projects.map((p) =>
           p.path === project.path
@@ -294,9 +294,10 @@ export const createProjectSlice: StateCreator<
       }
     } catch (error) {
       console.error("Failed to load project sessions:", error);
-      set({ error: { type: AppErrorType.UNKNOWN, message: String(error) } });
-    } finally {
-      set({ isLoadingSessions: false });
+      set({ 
+        error: { type: AppErrorType.UNKNOWN, message: String(error) },
+        isLoadingSessions: false 
+      });
     }
   },
 

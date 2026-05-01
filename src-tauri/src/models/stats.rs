@@ -58,6 +58,7 @@ pub struct ProjectStatsSummary {
     pub daily_stats: Vec<DailyStats>,
     pub activity_heatmap: Vec<ActivityHeatmap>,
     pub token_distribution: TokenDistribution,
+    pub model_distribution: Vec<ModelStats>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

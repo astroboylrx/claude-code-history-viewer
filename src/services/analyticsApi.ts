@@ -137,22 +137,12 @@ export async function fetchProjectStatsSummary(
   const { start_date, end_date, stats_mode } = options;
   const key = `projectStatsSummary:${projectPath}:${start_date ?? ""}:${end_date ?? ""}:${stats_mode}`;
   return dedupeInFlight(key, async () => {
-    const start = performance.now();
-
     const summary = await api<ProjectStatsSummary>("get_project_stats_summary", {
       projectPath,
       startDate: start_date,
       endDate: end_date,
       statsMode: stats_mode,
     });
-
-    if (import.meta.env.DEV) {
-      const duration = performance.now() - start;
-      console.log(
-        `[API] fetchProjectStatsSummary: ${duration.toFixed(1)}ms (${summary.total_sessions} sessions)`
-      );
-    }
-
     return summary;
   });
 }

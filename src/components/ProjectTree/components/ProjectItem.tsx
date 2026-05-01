@@ -7,7 +7,7 @@ import type { ProjectItemProps } from "../types";
 import { getWorktreeLabel } from "../../../utils/worktreeUtils";
 import { getProviderId, getProviderLabel } from "../../../utils/providers";
 
-export const ProjectItem: React.FC<ProjectItemProps> = ({
+export const ProjectItem: React.FC<ProjectItemProps> = React.memo(({ 
   project,
   isExpanded,
   isSelected,
@@ -180,4 +180,17 @@ export const ProjectItem: React.FC<ProjectItemProps> = ({
       ) : null}
     </button>
   );
-};
+}, (prev, next) => {
+  return (
+    prev.project.path === next.project.path &&
+    prev.isExpanded === next.isExpanded &&
+    prev.isSelected === next.isSelected &&
+    prev.onToggle === next.onToggle &&
+    prev.onClick === next.onClick &&
+    prev.onContextMenu === next.onContextMenu &&
+    prev.variant === next.variant &&
+    prev.showProviderBadge === next.showProviderBadge
+  );
+});
+
+ProjectItem.displayName = "ProjectItem";

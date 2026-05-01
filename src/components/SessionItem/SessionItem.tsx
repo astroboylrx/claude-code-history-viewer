@@ -8,7 +8,7 @@ import { SessionContextMenu } from "./components/SessionContextMenu";
 import { SessionMeta } from "./components/SessionMeta";
 import type { SessionItemProps } from "./types";
 
-export const SessionItem: React.FC<SessionItemProps> = ({
+export const SessionItem: React.FC<SessionItemProps> = React.memo(({
   session,
   isSelected,
   onSelect,
@@ -133,4 +133,14 @@ export const SessionItem: React.FC<SessionItemProps> = ({
       />
     </div>
   );
-};
+}, (prev, next) => {
+  return (
+    prev.session.session_id === next.session.session_id &&
+    prev.isSelected === next.isSelected &&
+    prev.onSelect === next.onSelect &&
+    prev.onHover === next.onHover &&
+    prev.formatTimeAgo === next.formatTimeAgo
+  );
+});
+
+SessionItem.displayName = "SessionItem";

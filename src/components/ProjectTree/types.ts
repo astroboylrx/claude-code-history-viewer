@@ -10,7 +10,6 @@ export interface ContextMenuState {
 
 export interface ProjectTreeProps {
   projects: ClaudeProject[];
-  sessions: ClaudeSession[];
   selectedProject: ClaudeProject | null;
   selectedSession: ClaudeSession | null;
   onProjectSelect: (project: ClaudeProject) => void;

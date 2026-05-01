@@ -40,8 +40,15 @@ pub fn scan_projects() -> Result<Vec<ClaudeProject>, String> {
 
     let mut projects = Vec::new();
 
-    for session_dir_entry in fs::read_dir(&sessions_path).map_err(|e| e.to_string())?.flatten() {
-        if session_dir_entry.file_type().map(|ft| ft.is_symlink()).unwrap_or(true) {
+    for session_dir_entry in fs::read_dir(&sessions_path)
+        .map_err(|e| e.to_string())?
+        .flatten()
+    {
+        if session_dir_entry
+            .file_type()
+            .map(|ft| ft.is_symlink())
+            .unwrap_or(true)
+        {
             continue;
         }
 
@@ -76,14 +83,13 @@ pub fn scan_projects() -> Result<Vec<ClaudeProject>, String> {
         let (message_count, last_modified, _summary) = extract_session_metadata(wire_path);
 
         // Try to get a better project name from state.json in the session subdir
-        let project_name = get_project_name_from_state(session_subdir)
-            .unwrap_or_else(|| {
-                session_dir
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string()
-            });
+        let project_name = get_project_name_from_state(session_subdir).unwrap_or_else(|| {
+            session_dir
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string()
+        });
 
         let actual_path = session_subdir.to_string_lossy().to_string();
 
@@ -109,9 +115,7 @@ pub fn load_sessions(
     project_path: &str,
     _exclude_sidechain: bool,
 ) -> Result<Vec<ClaudeSession>, String> {
-    let dir = project_path
-        .strip_prefix("kimi://")
-        .unwrap_or(project_path);
+    let dir = project_path.strip_prefix("kimi://").unwrap_or(project_path);
 
     let sessions_dir = PathBuf::from(dir);
     if !sessions_dir.is_dir() {
@@ -126,7 +130,10 @@ pub fn load_sessions(
 
     let mut sessions = Vec::new();
 
-    for subdir_entry in fs::read_dir(&sessions_dir).map_err(|e| e.to_string())?.flatten() {
+    for subdir_entry in fs::read_dir(&sessions_dir)
+        .map_err(|e| e.to_string())?
+        .flatten()
+    {
         let subdir = subdir_entry.path();
         if !subdir.is_dir() {
             continue;
@@ -169,9 +176,7 @@ pub fn load_sessions(
 
 /// Load messages from a Kimi session wire.jsonl file
 pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
-    let path = session_path
-        .strip_prefix("kimi://")
-        .unwrap_or(session_path);
+    let path = session_path.strip_prefix("kimi://").unwrap_or(session_path);
 
     let wire_path = PathBuf::from(path);
 
@@ -179,8 +184,8 @@ pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
         return Err(format!("Session file not found: {session_path}"));
     }
 
-    let data = fs::read_to_string(&wire_path)
-        .map_err(|e| format!("Failed to read session file: {e}"))?;
+    let data =
+        fs::read_to_string(&wire_path).map_err(|e| format!("Failed to read session file: {e}"))?;
 
     let session_id = wire_path
         .file_stem()
@@ -189,8 +194,8 @@ pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
         .to_string();
 
     let session_dir = wire_path.parent().and_then(|p| p.parent());
-    let project_name = session_dir
-        .and_then(|d| get_project_name_from_state(d))
+    let _project_name = session_dir
+        .and_then(get_project_name_from_state)
         .unwrap_or_else(|| {
             session_dir
                 .and_then(|d| d.file_name())
@@ -213,14 +218,14 @@ pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
             Err(_) => continue,
         };
 
-        let msg_type = raw.get("message").and_then(|m| m.get("type")).and_then(Value::as_str);
+        let msg_type = raw
+            .get("message")
+            .and_then(|m| m.get("type"))
+            .and_then(Value::as_str);
 
         match msg_type {
-            Some("metadata") => {
-                // Skip metadata lines
-                continue;
-            }
-            Some("TurnBegin") | Some("StepBegin") | Some("TurnEnd") | Some("StepEnd") => {
+            Some("metadata") => {}
+            Some("TurnBegin" | "StepBegin" | "TurnEnd" | "StepEnd") => {
                 // These are event markers, create a message for important ones
                 if msg_type == Some("TurnBegin") {
                     let timestamp = raw.get("timestamp").and_then(Value::as_f64);
@@ -454,8 +459,15 @@ pub fn search(query: &str, limit: usize) -> Result<Vec<ClaudeMessage>, String> {
     let query_lower = query.to_lowercase();
     let mut results = Vec::new();
 
-    for session_dir_entry in fs::read_dir(&sessions_path).map_err(|e| e.to_string())?.flatten() {
-        if session_dir_entry.file_type().map(|ft| ft.is_symlink()).unwrap_or(true) {
+    for session_dir_entry in fs::read_dir(&sessions_path)
+        .map_err(|e| e.to_string())?
+        .flatten()
+    {
+        if session_dir_entry
+            .file_type()
+            .map(|ft| ft.is_symlink())
+            .unwrap_or(true)
+        {
             continue;
         }
 
@@ -634,7 +646,10 @@ fn extract_session_metadata(wire_path: &Path) -> (usize, String, Option<String>)
             Err(_) => continue,
         };
 
-        let msg_type = raw.get("message").and_then(|m| m.get("type")).and_then(Value::as_str);
+        let msg_type = raw
+            .get("message")
+            .and_then(|m| m.get("type"))
+            .and_then(Value::as_str);
 
         if msg_type == Some("TurnBegin") {
             message_count += 1;
@@ -666,9 +681,7 @@ fn extract_session_metadata(wire_path: &Path) -> (usize, String, Option<String>)
                     }
                 }
             }
-        } else if msg_type == Some("ContentPart") {
-            message_count += 1;
-        } else if msg_type == Some("ToolCall") {
+        } else if msg_type == Some("ContentPart") || msg_type == Some("ToolCall") {
             message_count += 1;
         }
     }

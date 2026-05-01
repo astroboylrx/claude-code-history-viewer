@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "./store/useAppStore";
 import { useAnalytics } from "./hooks/useAnalytics";
 import { useUpdater } from "./hooks/useUpdater";
@@ -23,7 +24,6 @@ import "./App.css";
 function App() {
   const {
     projects,
-    sessions,
     selectedProject,
     selectedSession,
     messages,
@@ -65,7 +65,52 @@ function App() {
     isNavigatorOpen,
     toggleNavigator,
     activeProviders,
-  } = useAppStore();
+  } = useAppStore(
+    useShallow((state) => ({
+      projects: state.projects,
+      selectedProject: state.selectedProject,
+      selectedSession: state.selectedSession,
+      messages: state.messages,
+      isLoading: state.isLoading,
+      isLoadingProjects: state.isLoadingProjects,
+      isLoadingSessions: state.isLoadingSessions,
+      isLoadingMessages: state.isLoadingMessages,
+      isLoadingTokenStats: state.isLoadingTokenStats,
+      error: state.error,
+      sessionTokenStats: state.sessionTokenStats,
+      sessionConversationTokenStats: state.sessionConversationTokenStats,
+      projectTokenStats: state.projectTokenStats,
+      projectConversationTokenStats: state.projectConversationTokenStats,
+      projectTokenStatsSummary: state.projectTokenStatsSummary,
+      projectConversationTokenStatsSummary: state.projectConversationTokenStatsSummary,
+      projectTokenStatsPagination: state.projectTokenStatsPagination,
+      sessionSearch: state.sessionSearch,
+      selectProject: state.selectProject,
+      selectSession: state.selectSession,
+      clearProjectSelection: state.clearProjectSelection,
+      setSessionSearchQuery: state.setSessionSearchQuery,
+      setSearchFilterType: state.setSearchFilterType,
+      goToNextMatch: state.goToNextMatch,
+      goToPrevMatch: state.goToPrevMatch,
+      clearSessionSearch: state.clearSessionSearch,
+      loadGlobalStats: state.loadGlobalStats,
+      setAnalyticsCurrentView: state.setAnalyticsCurrentView,
+      loadMoreProjectTokenStats: state.loadMoreProjectTokenStats,
+      loadMoreRecentEdits: state.loadMoreRecentEdits,
+      updateUserSettings: state.updateUserSettings,
+      getGroupedProjects: state.getGroupedProjects,
+      getDirectoryGroupedProjects: state.getDirectoryGroupedProjects,
+      getEffectiveGroupingMode: state.getEffectiveGroupingMode,
+      hideProject: state.hideProject,
+      unhideProject: state.unhideProject,
+      isProjectHidden: state.isProjectHidden,
+      dateFilter: state.dateFilter,
+      setDateFilter: state.setDateFilter,
+      isNavigatorOpen: state.isNavigatorOpen,
+      toggleNavigator: state.toggleNavigator,
+      activeProviders: state.activeProviders,
+    }))
+  );
 
   const {
     state: analyticsState,
@@ -200,7 +245,7 @@ function App() {
 
   const handleTokenStatClick = useCallback(
     (stats: SessionTokenStats) => {
-      const session = sessions.find(
+      const session = useAppStore.getState().sessions.find(
         (s) =>
           s.actual_session_id === stats.session_id ||
           s.session_id === stats.session_id
@@ -212,46 +257,43 @@ function App() {
         console.warn("Session not found in loaded list:", stats.session_id);
       }
     },
-    [sessions, handleSessionSelect]
+    [handleSessionSelect]
   );
 
-  const handleProjectSelect = useCallback(
-    async (project: ClaudeProject) => {
-      const currentProject = useAppStore.getState().selectedProject;
+   const handleProjectSelect = useCallback(
+     async (project: ClaudeProject) => {
+       const currentProject = useAppStore.getState().selectedProject;
+       if (currentProject?.path === project.path) {
+         clearProjectSelection();
+         return;
+       }
 
-      if (currentProject?.path === project.path) {
-        clearProjectSelection();
-        return;
-      }
+       const activeView = useAppStore.getState().analytics.currentView;
+       setIsViewingGlobalStats(false);
 
-      const activeView = useAppStore.getState().analytics.currentView;
-      setIsViewingGlobalStats(false);
+       analyticsActions.clearAll();
+       setDateFilter({ start: null, end: null });
 
-      analyticsActions.clearAll();
-      setDateFilter({ start: null, end: null });
+       await selectProject(project);
 
-      await selectProject(project);
-
-      try {
-        if (activeView === "tokenStats") {
-          await analyticsActions.switchToTokenStats();
-        } else if (activeView === "board") {
-          await analyticsActions.switchToBoard();
-        } else if (activeView === "recentEdits") {
-          await analyticsActions.switchToRecentEdits();
-        } else if (activeView === "analytics") {
-          await analyticsActions.switchToAnalytics();
-        } else if (activeView === "settings") {
-          analyticsActions.switchToSettings();
-        } else {
-          analyticsActions.switchToMessages();
-        }
-      } catch (error) {
-        console.error(`Failed to auto-load ${activeView} view:`, error);
-      }
-    },
-    [clearProjectSelection, selectProject, analyticsActions, setDateFilter]
-  );
+       try {
+         if (activeView === "tokenStats") {
+           void analyticsActions.switchToTokenStats();
+         } else if (activeView === "board") {
+           void analyticsActions.switchToBoard();
+         } else if (activeView === "recentEdits") {
+           void analyticsActions.switchToRecentEdits();
+         } else if (activeView === "settings") {
+           analyticsActions.switchToSettings();
+         } else {
+           void analyticsActions.switchToAnalytics();
+         }
+       } catch (error) {
+         console.error(`Failed to auto-load ${activeView} view:`, error);
+       }
+     },
+     [clearProjectSelection, selectProject, analyticsActions, setDateFilter]
+   );
 
   const handleSessionHover = useCallback(
     (session: ClaudeSession) => {
@@ -265,7 +307,6 @@ function App() {
   return (
     <AppLayout
       projects={projects}
-      sessions={sessions}
       selectedProject={selectedProject}
       selectedSession={selectedSession}
       messages={messages}

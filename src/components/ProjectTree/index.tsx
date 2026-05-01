@@ -41,7 +41,6 @@ type ProviderTabId = "all" | ProviderId;
 
 export const ProjectTree: React.FC<ProjectTreeProps> = ({
   projects,
-  sessions,
   selectedProject,
   selectedSession,
   onProjectSelect,
@@ -68,6 +67,7 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const keyboardHelpId = `${asideId}-keyboard-help`;
+  const sessions = useAppStore((state) => state.sessions);
   const activeProviders = useAppStore((state) => state.activeProviders);
   const detectedProviders = useAppStore((state) => state.providers);
   const isDetectingProviders = useAppStore((state) => state.isDetectingProviders);
@@ -107,6 +107,7 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
       codex: 0,
       cursor: 0,
       gemini: 0,
+      kimi: 0,
       opencode: 0,
     };
 
@@ -375,22 +376,24 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
           next.delete(project.path);
           return next;
         });
+        onProjectSelect(project);
       } else {
-        // Selecting new project: collapse all other projects (accordion), expand this one
-        setExpandedProjects((prev) => {
-          const next = new Set<string>();
-          // Preserve group-level expansions (dir:, group: prefixed keys)
-          for (const key of prev) {
-            if (key.startsWith("dir:") || key.startsWith("group:")) {
-              next.add(key);
+        // Selecting new project: defer expansion to avoid blocking IPC responses
+        onProjectSelect(project);
+        setTimeout(() => {
+          setExpandedProjects((prev) => {
+            const next = new Set<string>();
+            // Preserve group-level expansions (dir:, group: prefixed keys)
+            for (const key of prev) {
+              if (key.startsWith("dir:") || key.startsWith("group:")) {
+                next.add(key);
+              }
             }
-          }
-          next.add(project.path);
-          return next;
-        });
+            next.add(project.path);
+            return next;
+          });
+        }, 0);
       }
-
-      onProjectSelect(project);
     },
     [selectedProject, onProjectSelect, setExpandedProjects]
   );

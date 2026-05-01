@@ -5,10 +5,8 @@
  * Each month is rendered as a separate block with day-of-week headers.
  */
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Tooltip, TooltipTrigger } from "../../ui/tooltip";
-import { ChartTooltip } from "../../ui/chart-tooltip";
 import { cn } from "@/lib/utils";
 import type { DailyStats } from "../../../types";
 import { formatNumber, getHeatColor } from "../utils";
@@ -124,8 +122,8 @@ const MonthBlock: React.FC<{
   weeks: CalendarDay[][];
   maxActivity: number;
   weekdayLabels: string[];
-}> = React.memo(({ yearMonth, weeks, maxActivity, weekdayLabels }) => {
-  const { t } = useTranslation();
+  onHover: (cell: CalendarDay | null, rect: DOMRect | null) => void;
+}> = React.memo(({ yearMonth, weeks, maxActivity, weekdayLabels, onHover }) => {
   const monthLabel = formatMonthLabel(yearMonth);
 
   return (
@@ -134,7 +132,6 @@ const MonthBlock: React.FC<{
         {monthLabel}
       </div>
 
-      {/* Day-of-week headers */}
       <div className="grid grid-cols-7 gap-px">
         {weekdayLabels.map((label, i) => (
           <div
@@ -146,7 +143,6 @@ const MonthBlock: React.FC<{
         ))}
       </div>
 
-      {/* Week rows */}
       {weeks.map((week, weekIdx) => (
         <div key={weekIdx} className="grid grid-cols-7 gap-px">
           {week.map((cell, dayIdx) => {
@@ -158,40 +154,22 @@ const MonthBlock: React.FC<{
             const heatColor = getHeatColor(intensity);
 
             return (
-              <Tooltip key={dayIdx}>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      "w-[14px] h-[14px] rounded-sm cursor-pointer",
-                      "transition-transform duration-150",
-                      "hover:scale-125 hover:z-10",
-                      intensity > 0 && "hover:ring-1 hover:ring-white/30"
-                    )}
-                    style={{ backgroundColor: heatColor }}
-                    aria-label={`${cell.date}: ${cell.messageCount} ${t("analytics.tooltip.messages")}`}
-                  >
-                    {/* Show day number only on 1st for orientation */}
-                    {cell.dayNum === 1 && (
-                      <span className="text-[6px] text-foreground/40 leading-none flex items-center justify-center h-full">
-                        1
-                      </span>
-                    )}
-                  </button>
-                </TooltipTrigger>
-                <ChartTooltip
-                  title={cell.date}
-                  rows={[
-                    {
-                      label: t("analytics.tooltip.messages"),
-                      value: cell.messageCount,
-                      color: intensity > 0.3 ? "var(--metric-green)" : undefined,
-                    },
-                    { label: t("analytics.tooltip.sessions"), value: cell.sessionCount },
-                    { label: t("analytics.tooltip.tokens"), value: formatNumber(cell.totalTokens) },
-                  ]}
-                />
-              </Tooltip>
+              <div
+                key={dayIdx}
+                className={cn(
+                  "w-[14px] h-[14px] rounded-sm",
+                  intensity > 0 && "cursor-pointer hover:scale-125 hover:z-10 hover:ring-1 hover:ring-white/30"
+                )}
+                style={{ backgroundColor: heatColor }}
+                onMouseEnter={(e) => onHover(cell, e.currentTarget.getBoundingClientRect())}
+                onMouseLeave={() => onHover(null, null)}
+              >
+                {cell.dayNum === 1 && (
+                  <span className="text-[6px] text-foreground/40 leading-none flex items-center justify-center h-full">
+                    1
+                  </span>
+                )}
+              </div>
             );
           })}
         </div>
@@ -205,6 +183,13 @@ MonthBlock.displayName = "MonthBlock";
 export const ActivityHeatmapComponent: React.FC<ActivityHeatmapProps> = React.memo(({ data }) => {
   const { t } = useTranslation();
   const weekdayLabels = t("analytics.weekdayNamesShort", { returnObjects: true }) as string[];
+  const [hoveredCell, setHoveredCell] = useState<CalendarDay | null>(null);
+  const [tooltipRect, setTooltipRect] = useState<DOMRect | null>(null);
+
+  const handleHover = useCallback((cell: CalendarDay | null, rect: DOMRect | null) => {
+    setHoveredCell(cell);
+    setTooltipRect(rect);
+  }, []);
 
   const { months, maxActivity, totalMessages } = useMemo(() => {
     const grouped = groupByMonth(data);
@@ -226,9 +211,17 @@ export const ActivityHeatmapComponent: React.FC<ActivityHeatmapProps> = React.me
     return { months: monthEntries, maxActivity: Math.max(max, 1), totalMessages: total };
   }, [data]);
 
+  const tooltipStyle = tooltipRect && hoveredCell?.date ? {
+    position: "fixed" as const,
+    left: tooltipRect.left + tooltipRect.width / 2,
+    top: tooltipRect.top - 8,
+    transform: "translate(-50%, -100%)",
+    zIndex: 50,
+    pointerEvents: "none" as const,
+  } : undefined;
+
   return (
     <div className="space-y-4">
-      {/* Monthly calendar blocks */}
       <div className="flex flex-wrap gap-4">
         {months.map(({ key, weeks }) => (
           <MonthBlock
@@ -237,11 +230,23 @@ export const ActivityHeatmapComponent: React.FC<ActivityHeatmapProps> = React.me
             weeks={weeks}
             maxActivity={maxActivity}
             weekdayLabels={weekdayLabels}
+            onHover={handleHover}
           />
         ))}
       </div>
 
-      {/* Legend */}
+      {hoveredCell?.date && tooltipStyle && (
+        <div
+          style={tooltipStyle}
+          className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-xs shadow-lg"
+        >
+          <div className="font-medium mb-1">{hoveredCell.date}</div>
+          <div>{t("analytics.tooltip.messages")}: {hoveredCell.messageCount}</div>
+          <div>{t("analytics.tooltip.sessions")}: {hoveredCell.sessionCount}</div>
+          <div>{t("analytics.tooltip.tokens")}: {formatNumber(hoveredCell.totalTokens)}</div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between pt-3 border-t border-border/30">
         <div className="flex items-center gap-2">
           <span className="text-[9px] font-medium text-muted-foreground">

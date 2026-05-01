@@ -4,7 +4,7 @@
  * Displays project-level analytics and statistics.
  */
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { MessageCircle, Activity, Clock, Wrench, Layers, Cpu, TrendingUp, Database } from "lucide-react";
 import { LoadingState } from "@/components/ui/loading";
@@ -19,7 +19,8 @@ import {
   DailyTrendChart,
   TokenDistributionChart,
 } from "../components";
-import { formatNumber, generateTrendData, extractProjectGrowth } from "../utils";
+import { formatNumber, formatCurrency, generateTrendData, extractProjectGrowth } from "../utils";
+import { calculateGlobalCostSummary } from "../utils/globalCalculations";
 import { supportsConversationBreakdown } from "../../../utils/providers";
 
 interface ProjectStatsViewProps {
@@ -35,11 +36,43 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
 }) => {
   const { t } = useTranslation();
 
+  const [showCharts, setShowCharts] = useState(false);
+
+  useEffect(() => {
+    if (!projectSummary) {
+      setShowCharts(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => setShowCharts(true));
+    return () => cancelAnimationFrame(id);
+  }, [projectSummary]);
+
   // Generate full range daily data using utility function
   const dailyData = useMemo(
     () => generateTrendData(projectSummary?.daily_stats),
     [projectSummary?.daily_stats]
   );
+
+  // Calculate billing cost from model distribution
+  const billingCostSummary = useMemo(() => {
+    if (!projectSummary?.model_distribution?.length) {
+      return { totalEstimatedCost: 0 };
+    }
+    return calculateGlobalCostSummary(
+      projectSummary.model_distribution,
+      projectSummary.total_tokens
+    );
+  }, [projectSummary?.model_distribution, projectSummary?.total_tokens]);
+
+  // Calculate conversation cost if conversation summary is available
+  const conversationCost = useMemo(() => {
+    if (!conversationSummary?.model_distribution?.length) return null;
+    const summary = calculateGlobalCostSummary(
+      conversationSummary.model_distribution,
+      conversationSummary.total_tokens
+    );
+    return summary.totalEstimatedCost;
+  }, [conversationSummary?.model_distribution, conversationSummary?.total_tokens]);
 
   // 데이터가 없으면 항상 로딩 상태 표시 (뷰 전환 직후 isLoading이 false일 수 있음)
   if (!projectSummary) {
@@ -58,9 +91,10 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
   // Calculate growth metrics using utility function
   const { tokenGrowth, messageGrowth } = extractProjectGrowth(projectSummary);
   const billingTokens = projectSummary.total_tokens;
+  const billingCost = billingCostSummary.totalEstimatedCost;
 
   return (
-    <div className="space-y-6 animate-stagger">
+    <div className="space-y-6">
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
@@ -75,9 +109,15 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
           label={t("analytics.totalTokens")}
           value={formatNumber(projectSummary.total_tokens)}
           trend={tokenGrowth}
-          subValue={t("analytics.sessionCount", "{{count}} sessions", {
-            count: projectSummary.total_sessions,
-          })}
+          subValue={
+            billingCost > 0
+              ? t("analytics.estimatedCostValue", "Estimated Cost: {{cost}}", {
+                  cost: formatCurrency(billingCost),
+                })
+              : t("analytics.sessionCount", "{{count}} sessions", {
+                  count: projectSummary.total_sessions,
+                })
+          }
           colorVariant="blue"
         />
         <MetricCard
@@ -100,9 +140,12 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
       <BillingBreakdownCard
         billingTokens={billingTokens}
         conversationTokens={conversationSummary != null ? conversationSummary.total_tokens : null}
+        billingCost={billingCost}
+        conversationCost={conversationCost}
         showProviderLimitHelp={!supportsConversationBreakdown(providerId)}
       />
 
+      {showCharts && (<>
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SectionCard title={t("analytics.activityHeatmapTitle")} icon={Layers} colorVariant="green">
@@ -134,6 +177,7 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
           total={projectSummary.total_tokens}
         />
       </SectionCard>
+      </>)}
     </div>
   );
 };

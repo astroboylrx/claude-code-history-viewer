@@ -1,6 +1,7 @@
-import { useCallback } from "react";
+import { useCallback, startTransition } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "../../store/useAppStore";
 import { AppErrorType, type MetricMode, type StatsMode } from "../../types";
 
@@ -14,6 +15,7 @@ export function useAnalyticsNavigation() {
     setAnalyticsMetricMode,
     setAnalyticsProjectSummary,
     setAnalyticsProjectConversationSummary,
+    setAnalyticsProjectSummaries,
     setAnalyticsSessionComparison,
     setAnalyticsLoadingProjectSummary,
     setAnalyticsLoadingSessionComparison,
@@ -32,7 +34,36 @@ export function useAnalyticsNavigation() {
     loadGlobalStats,
     clearTokenStats,
     clearBoard,
-  } = useAppStore();
+  } = useAppStore(
+    useShallow((state) => ({
+      analytics: state.analytics,
+      selectedSession: state.selectedSession,
+      setAnalyticsCurrentView: state.setAnalyticsCurrentView,
+      setAnalyticsStatsMode: state.setAnalyticsStatsMode,
+      setAnalyticsMetricMode: state.setAnalyticsMetricMode,
+      setAnalyticsProjectSummary: state.setAnalyticsProjectSummary,
+      setAnalyticsProjectConversationSummary: state.setAnalyticsProjectConversationSummary,
+      setAnalyticsProjectSummaries: state.setAnalyticsProjectSummaries,
+      setAnalyticsSessionComparison: state.setAnalyticsSessionComparison,
+      setAnalyticsLoadingProjectSummary: state.setAnalyticsLoadingProjectSummary,
+      setAnalyticsLoadingSessionComparison: state.setAnalyticsLoadingSessionComparison,
+      setAnalyticsProjectSummaryError: state.setAnalyticsProjectSummaryError,
+      setAnalyticsSessionComparisonError: state.setAnalyticsSessionComparisonError,
+      setAnalyticsRecentEdits: state.setAnalyticsRecentEdits,
+      setAnalyticsLoadingRecentEdits: state.setAnalyticsLoadingRecentEdits,
+      setAnalyticsRecentEditsError: state.setAnalyticsRecentEditsError,
+      resetAnalytics: state.resetAnalytics,
+      clearAnalyticsErrors: state.clearAnalyticsErrors,
+      loadProjectTokenStats: state.loadProjectTokenStats,
+      loadProjectStatsSummary: state.loadProjectStatsSummary,
+      loadSessionComparison: state.loadSessionComparison,
+      loadSessionTokenStats: state.loadSessionTokenStats,
+      loadRecentEdits: state.loadRecentEdits,
+      loadGlobalStats: state.loadGlobalStats,
+      clearTokenStats: state.clearTokenStats,
+      clearBoard: state.clearBoard,
+    }))
+  );
 
   const switchToMessages = useCallback(() => {
     setAnalyticsCurrentView("messages");
@@ -86,32 +117,38 @@ export function useAnalyticsNavigation() {
   ]);
 
   const switchToAnalytics = useCallback(async () => {
-    const project = useAppStore.getState().selectedProject;
-    if (!project) {
-      throw new Error(t("common.hooks.noProjectSelected"));
-    }
-
-    setAnalyticsCurrentView("analytics");
-    clearAnalyticsErrors();
-
-    try {
-      setAnalyticsLoadingProjectSummary(true);
-      try {
-        const summary = await loadProjectStatsSummary(project.path);
-        setAnalyticsProjectSummary(summary);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : t("common.hooks.projectSummaryLoadFailed");
-        setAnalyticsProjectSummaryError(errorMessage);
-        throw error;
-      } finally {
-        setAnalyticsLoadingProjectSummary(false);
+      const project = useAppStore.getState().selectedProject;
+      if (!project) {
+        throw new Error(t("common.hooks.noProjectSelected"));
       }
 
-      if (selectedSession) {
-        setAnalyticsLoadingSessionComparison(true);
+      startTransition(() => {
+        setAnalyticsCurrentView("analytics");
+        clearAnalyticsErrors();
+      });
+
+      try {
+        try {
+          const { billing, conversation } = await loadProjectStatsSummary(project.path);
+
+          startTransition(() => {
+            setAnalyticsProjectSummaries(billing, conversation);
+          });
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+              : t("common.hooks.projectSummaryLoadFailed");
+          startTransition(() => {
+            setAnalyticsProjectSummaryError(errorMessage);
+          });
+          throw error;
+        }
+
+    if (selectedSession) {
+        startTransition(() => {
+          setAnalyticsLoadingSessionComparison(true);
+        });
         try {
           const [comparison] = await Promise.all([
             loadSessionComparison(
@@ -120,19 +157,25 @@ export function useAnalyticsNavigation() {
             ),
             loadSessionTokenStats(selectedSession.file_path),
           ]);
-          setAnalyticsSessionComparison(comparison);
-          setAnalyticsSessionComparisonError(null);
+          startTransition(() => {
+            setAnalyticsSessionComparison(comparison);
+            setAnalyticsSessionComparisonError(null);
+          });
         } catch (error) {
           const errorMessage =
             error instanceof Error
               ? error.message
               : t("common.hooks.sessionComparisonLoadFailed");
-          setAnalyticsSessionComparisonError(errorMessage);
+          startTransition(() => {
+            setAnalyticsSessionComparisonError(errorMessage);
+          });
         } finally {
-          setAnalyticsLoadingSessionComparison(false);
+          startTransition(() => {
+            setAnalyticsLoadingSessionComparison(false);
+          });
         }
       }
-    } catch (error) {
+     } catch (error) {
       console.error("Failed to load analytics:", error);
       throw error;
     }
@@ -293,13 +336,15 @@ export function useAnalyticsNavigation() {
         return;
       }
 
-      setAnalyticsStatsMode(mode);
-      clearTokenStats();
-      setAnalyticsProjectSummary(null);
-      setAnalyticsProjectConversationSummary(null);
-      setAnalyticsSessionComparison(null);
-      setAnalyticsProjectSummaryError(null);
-      setAnalyticsSessionComparisonError(null);
+      startTransition(() => {
+        setAnalyticsStatsMode(mode);
+        clearTokenStats();
+        setAnalyticsProjectSummary(null);
+        setAnalyticsProjectConversationSummary(null);
+        setAnalyticsSessionComparison(null);
+        setAnalyticsProjectSummaryError(null);
+        setAnalyticsSessionComparisonError(null);
+      });
 
       const state = useAppStore.getState();
       const project = state.selectedProject;
@@ -328,16 +373,24 @@ export function useAnalyticsNavigation() {
         }
 
         if (currentView === "analytics") {
-          setAnalyticsLoadingProjectSummary(true);
+          startTransition(() => {
+            setAnalyticsLoadingProjectSummary(true);
+          });
           try {
-            const summary = await loadProjectStatsSummary(project.path);
-            setAnalyticsProjectSummary(summary);
+            const { billing, conversation } = await loadProjectStatsSummary(project.path);
+            startTransition(() => {
+              setAnalyticsProjectSummaries(billing, conversation);
+            });
           } finally {
-            setAnalyticsLoadingProjectSummary(false);
+            startTransition(() => {
+              setAnalyticsLoadingProjectSummary(false);
+            });
           }
 
           if (session) {
-            setAnalyticsLoadingSessionComparison(true);
+            startTransition(() => {
+              setAnalyticsLoadingSessionComparison(true);
+            });
             try {
               const [comparison] = await Promise.all([
                 loadSessionComparison(
@@ -346,9 +399,13 @@ export function useAnalyticsNavigation() {
                 ),
                 loadSessionTokenStats(session.file_path),
               ]);
-              setAnalyticsSessionComparison(comparison);
+              startTransition(() => {
+                setAnalyticsSessionComparison(comparison);
+              });
             } finally {
-              setAnalyticsLoadingSessionComparison(false);
+              startTransition(() => {
+                setAnalyticsLoadingSessionComparison(false);
+              });
             }
           }
         }
@@ -359,10 +416,12 @@ export function useAnalyticsNavigation() {
             : t("common.hooks.projectSummaryLoadFailed");
         toast.error(errorMessage);
         if (currentView === "analytics") {
-          setAnalyticsProjectSummaryError(errorMessage);
-          if (session != null) {
-            setAnalyticsSessionComparisonError(errorMessage);
-          }
+          startTransition(() => {
+            setAnalyticsProjectSummaryError(errorMessage);
+            if (session != null) {
+              setAnalyticsSessionComparisonError(errorMessage);
+            }
+          });
           return;
         }
 
@@ -374,7 +433,9 @@ export function useAnalyticsNavigation() {
           return;
         }
 
-        setAnalyticsProjectSummaryError(errorMessage);
+        startTransition(() => {
+          setAnalyticsProjectSummaryError(errorMessage);
+        });
       }
     },
     [

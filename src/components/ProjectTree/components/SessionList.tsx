@@ -51,7 +51,7 @@ const SessionRow: React.FC<SessionRowProps> = ({ index, style, data }) => {
   );
 };
 
-export const SessionList: React.FC<SessionListProps> = ({
+export const SessionList: React.FC<SessionListProps> = React.memo(({
   sessions,
   selectedSession,
   isLoading,
@@ -281,4 +281,17 @@ export const SessionList: React.FC<SessionListProps> = ({
       </div>
     </div>
   );
-};
+}, (prev, next) => {
+  return (
+    prev.sessions.length === next.sessions.length &&
+    prev.sessions.every((s, i) => s.session_id === next.sessions[i].session_id) &&
+    prev.selectedSession?.session_id === next.selectedSession?.session_id &&
+    prev.isLoading === next.isLoading &&
+    prev.onSessionSelect === next.onSessionSelect &&
+    prev.onSessionHover === next.onSessionHover &&
+    prev.formatTimeAgo === next.formatTimeAgo &&
+    prev.variant === next.variant
+  );
+});
+
+SessionList.displayName = "SessionList";

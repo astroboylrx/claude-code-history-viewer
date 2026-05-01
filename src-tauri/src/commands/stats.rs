@@ -15,6 +15,9 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+use std::time::SystemTime;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 enum StatsProvider {
@@ -22,6 +25,7 @@ enum StatsProvider {
     Claude,
     Codex,
     OpenCode,
+    Kimi,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +56,7 @@ fn stats_provider_id(provider: StatsProvider) -> &'static str {
         StatsProvider::Claude => "claude",
         StatsProvider::Codex => "codex",
         StatsProvider::OpenCode => "opencode",
+        StatsProvider::Kimi => "kimi",
     }
 }
 
@@ -126,6 +131,7 @@ fn all_stats_providers() -> HashSet<StatsProvider> {
         StatsProvider::Claude,
         StatsProvider::Codex,
         StatsProvider::OpenCode,
+        StatsProvider::Kimi,
     ]
     .into_iter()
     .collect()
@@ -143,6 +149,7 @@ fn parse_active_stats_providers(active_providers: Option<Vec<String>>) -> HashSe
             "claude" => Some(StatsProvider::Claude),
             "codex" => Some(StatsProvider::Codex),
             "opencode" => Some(StatsProvider::OpenCode),
+            "kimi" => Some(StatsProvider::Kimi),
             _ => {
                 unknown.push(provider);
                 None
@@ -165,6 +172,8 @@ fn detect_project_provider(project_path: &str) -> StatsProvider {
         StatsProvider::Codex
     } else if project_path.starts_with("opencode://") {
         StatsProvider::OpenCode
+    } else if project_path.starts_with("kimi://") {
+        StatsProvider::Kimi
     } else {
         StatsProvider::Claude
     }
@@ -173,6 +182,10 @@ fn detect_project_provider(project_path: &str) -> StatsProvider {
 fn detect_session_provider(session_path: &str) -> StatsProvider {
     if session_path.starts_with("opencode://") {
         return StatsProvider::OpenCode;
+    }
+
+    if session_path.starts_with("kimi://") {
+        return StatsProvider::Kimi;
     }
 
     let is_rollout = PathBuf::from(session_path)
@@ -706,12 +719,14 @@ fn collect_provider_global_file_stats(
     let projects = match provider {
         StatsProvider::Codex => providers::codex::scan_projects().unwrap_or_default(),
         StatsProvider::OpenCode => providers::opencode::scan_projects().unwrap_or_default(),
+        StatsProvider::Kimi => providers::kimi::scan_projects().unwrap_or_default(),
         StatsProvider::Claude => Vec::new(),
     };
 
     let provider_tag = match provider {
         StatsProvider::Codex => "codex",
         StatsProvider::OpenCode => "opencode",
+        StatsProvider::Kimi => "kimi",
         StatsProvider::Claude => "claude",
     };
 
@@ -725,6 +740,7 @@ fn collect_provider_global_file_stats(
         let sessions = match provider {
             StatsProvider::Codex => providers::codex::load_sessions(&project.path, false),
             StatsProvider::OpenCode => providers::opencode::load_sessions(&project.path, false),
+            StatsProvider::Kimi => providers::kimi::load_sessions(&project.path, false),
             StatsProvider::Claude => Ok(Vec::new()),
         }
         .unwrap_or_default();
@@ -741,6 +757,7 @@ fn collect_provider_global_file_stats(
             let messages = match provider {
                 StatsProvider::Codex => providers::codex::load_messages(file_path),
                 StatsProvider::OpenCode => providers::opencode::load_messages(file_path),
+                StatsProvider::Kimi => providers::kimi::load_messages(file_path),
                 StatsProvider::Claude => Ok(Vec::new()),
             }
             .unwrap_or_default();
@@ -767,6 +784,7 @@ struct ProjectSessionFileStats {
     tool_usage: HashMap<String, (u32, u32)>,
     daily_stats: HashMap<String, DailyStats>,
     activity_data: HashMap<(u8, u8), (u32, u64)>,
+    model_usage: HashMap<String, (u32, u64, u64, u64, u64, u64)>,
     session_duration_minutes: u32,
     session_dates: HashSet<String>,
     timestamps: Vec<DateTime<Utc>>,
@@ -853,6 +871,20 @@ fn process_session_file_for_project_stats(
 
                 // Track tool usage
                 track_tool_usage(&message, &mut stats.tool_usage);
+
+                // Track model usage
+                if let Some(ref model_name) = message.model {
+                    let model_entry = stats
+                        .model_usage
+                        .entry(model_name.clone())
+                        .or_insert((0, 0, 0, 0, 0, 0));
+                    model_entry.0 += 1;
+                    model_entry.1 += input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens;
+                    model_entry.2 += input_tokens;
+                    model_entry.3 += output_tokens;
+                    model_entry.4 += cache_creation_tokens;
+                    model_entry.5 += cache_read_tokens;
+                }
             }
         }
     }
@@ -1101,6 +1133,17 @@ fn resolve_provider_project_name(provider: StatsProvider, project_path: &str) ->
                 .unwrap_or(project_path)
                 .to_string()
         }
+        StatsProvider::Kimi => {
+            if let Ok(projects) = providers::kimi::scan_projects() {
+                if let Some(project) = projects.into_iter().find(|p| p.path == project_path) {
+                    return project.name;
+                }
+            }
+            project_path
+                .strip_prefix("kimi://")
+                .unwrap_or(project_path)
+                .to_string()
+        }
     }
 }
 
@@ -1115,6 +1158,14 @@ fn resolve_provider_project_name_from_session(
                 .and_then(|rest| rest.split('/').next())
                 .unwrap_or("unknown");
             let project_path = format!("opencode://{project_part}");
+            resolve_provider_project_name(provider, &project_path)
+        }
+        StatsProvider::Kimi => {
+            let project_part = session_path
+                .strip_prefix("kimi://")
+                .and_then(|rest| rest.split('/').next())
+                .unwrap_or("unknown");
+            let project_path = format!("kimi://{project_part}");
             resolve_provider_project_name(provider, &project_path)
         }
         StatsProvider::Codex => {
@@ -1140,6 +1191,7 @@ fn load_provider_sessions_for_stats(
     match provider {
         StatsProvider::Codex => providers::codex::load_sessions(project_path, false),
         StatsProvider::OpenCode => providers::opencode::load_sessions(project_path, false),
+        StatsProvider::Kimi => providers::kimi::load_sessions(project_path, false),
         StatsProvider::Claude => {
             Err("Claude sessions are handled by legacy stats path".to_string())
         }
@@ -1153,6 +1205,7 @@ fn load_provider_messages_for_stats(
     match provider {
         StatsProvider::Codex => providers::codex::load_messages(&session.file_path),
         StatsProvider::OpenCode => providers::opencode::load_messages(&session.file_path),
+        StatsProvider::Kimi => providers::kimi::load_messages(&session.file_path),
         StatsProvider::Claude => {
             Err("Claude messages are handled by legacy stats path".to_string())
         }
@@ -1594,6 +1647,7 @@ pub async fn get_session_token_stats(
         let messages = match provider {
             StatsProvider::Codex => providers::codex::load_messages(&session_path)?,
             StatsProvider::OpenCode => providers::opencode::load_messages(&session_path)?,
+            StatsProvider::Kimi => providers::kimi::load_messages(&session_path)?,
             StatsProvider::Claude => Vec::new(),
         };
 
@@ -1961,6 +2015,7 @@ pub async fn get_project_stats_summary(
     let mut tool_usage_map: HashMap<String, (u32, u32)> = HashMap::new();
     let mut daily_stats_map: HashMap<String, DailyStats> = HashMap::new();
     let mut activity_map: HashMap<(u8, u8), (u32, u64)> = HashMap::new();
+    let mut model_usage_map: HashMap<String, (u32, u64, u64, u64, u64, u64)> = HashMap::new();
     let mut session_count_by_date: HashMap<String, usize> = HashMap::new();
 
     for stats in file_stats {
@@ -1998,6 +2053,19 @@ pub async fn get_project_stats_summary(
             let entry = activity_map.entry((hour, day)).or_insert((0, 0));
             entry.0 += count;
             entry.1 += tokens;
+        }
+
+        // Aggregate model usage
+        for (model, (msg_count, total, input, output, cache_create, cache_read)) in
+            stats.model_usage
+        {
+            let entry = model_usage_map.entry(model).or_insert((0, 0, 0, 0, 0, 0));
+            entry.0 += msg_count;
+            entry.1 += total;
+            entry.2 += input;
+            entry.3 += output;
+            entry.4 += cache_create;
+            entry.5 += cache_read;
         }
 
         // Aggregate per-day session counts from this session's active dates.
@@ -2074,6 +2142,34 @@ pub async fn get_project_stats_summary(
         .iter()
         .max_by_key(|a| a.activity_count)
         .map_or(0, |a| a.hour);
+
+    summary.model_distribution = model_usage_map
+        .into_iter()
+        .map(
+            |(
+                model_name,
+                (
+                    message_count,
+                    token_count,
+                    input_tokens,
+                    output_tokens,
+                    cache_creation_tokens,
+                    cache_read_tokens,
+                ),
+            )| ModelStats {
+                model_name,
+                message_count,
+                token_count,
+                input_tokens,
+                output_tokens,
+                cache_creation_tokens,
+                cache_read_tokens,
+            },
+        )
+        .collect();
+    summary
+        .model_distribution
+        .sort_by(|a, b| b.token_count.cmp(&a.token_count));
 
     let total_time = start.elapsed();
     log::debug!(
@@ -2440,6 +2536,13 @@ pub async fn get_global_stats_summary(
             collect_provider_global_file_stats(StatsProvider::OpenCode, mode, s_ref, e_ref);
         project_names.extend(opencode_projects);
         file_stats.extend(opencode_stats);
+    }
+
+    if providers_to_include.contains(&StatsProvider::Kimi) {
+        let (kimi_stats, kimi_projects) =
+            collect_provider_global_file_stats(StatsProvider::Kimi, mode, s_ref, e_ref);
+        project_names.extend(kimi_projects);
+        file_stats.extend(kimi_stats);
     }
 
     // When date filtering is active, exclude sessions that ended up with zero messages

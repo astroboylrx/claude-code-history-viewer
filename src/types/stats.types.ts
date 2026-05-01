@@ -115,6 +115,7 @@ export interface ProjectStatsSummary {
     cache_creation: number;
     cache_read: number;
   };
+  model_distribution: ModelStats[];
 }
 
 export interface ProjectRanking {

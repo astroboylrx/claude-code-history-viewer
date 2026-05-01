@@ -42,7 +42,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     selectedSession != null && sessionStats != null && sessionComparison != null;
 
   useEffect(() => {
-    setActiveTab("project");
+    setActiveTab((prev) => prev === "project" ? prev : "project");
   }, [selectedProject?.name]);
 
   // Global stats or no project
