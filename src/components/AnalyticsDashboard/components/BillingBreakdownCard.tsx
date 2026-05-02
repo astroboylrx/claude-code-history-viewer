@@ -44,17 +44,17 @@ export const BillingBreakdownCard: React.FC<BillingBreakdownCardProps> = ({
       className={className}
     >
       <div className="space-y-3">
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {`${t("analytics.billingTotal", "Billing Total")} = ${t("analytics.conversationOnly", "Conversation Only")} + ${t("analytics.nonConversation", "Non-conversation")}`}
         </p>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {t(
             "analytics.billingBreakdownHelp",
             "Conversation includes user/assistant turns. Non-conversation includes tool or system billed traffic."
           )}
         </p>
         {showProviderLimitHelp && (
-          <p className="text-[11px] text-amber-700 dark:text-amber-300">
+          <p className="text-sm text-amber-700 dark:text-amber-300">
             {t(
               "analytics.billingBreakdownProviderLimitHelp",
               "For some providers, conversation-only and billing totals can match because sidechain metadata is unavailable."
@@ -62,7 +62,7 @@ export const BillingBreakdownCard: React.FC<BillingBreakdownCardProps> = ({
           </p>
         )}
 
-        <div className="h-2 w-full rounded-full bg-muted/30 overflow-hidden flex">
+        <div className="h-2.5 w-full rounded-full bg-muted/30 overflow-hidden flex">
           <div
             className="h-full bg-metric-green transition-all duration-300"
             style={{ width: hasConversationTokenData ? `${conversationTokenRatio}%` : "0%" }}
@@ -73,56 +73,56 @@ export const BillingBreakdownCard: React.FC<BillingBreakdownCardProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="p-3 rounded-lg bg-muted/30">
-            <p className="text-[11px] text-muted-foreground">{t("analytics.billingTotal", "Billing Total")}</p>
-            <p className="font-mono text-[14px] font-semibold text-foreground">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 rounded-lg bg-muted/30">
+            <p className="text-sm text-muted-foreground">{t("analytics.billingTotal", "Billing Total")}</p>
+            <p className="font-mono text-lg font-semibold text-foreground">
               {formatNumber(billingTokens)}
             </p>
             {hasCostData && (
-              <p className="font-mono text-[11px] text-muted-foreground">
+              <p className="font-mono text-sm text-muted-foreground">
                 {formatCurrency(safeBillingCost)}
               </p>
             )}
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {t("analytics.oneHundredPercent", "100%")}
             </p>
           </div>
-          <div className="p-3 rounded-lg bg-muted/30">
-            <p className="text-[11px] text-muted-foreground">{t("analytics.conversationOnly", "Conversation Only")}</p>
-            <p className="font-mono text-[14px] font-semibold text-foreground">
+          <div className="p-4 rounded-lg bg-muted/30">
+            <p className="text-sm text-muted-foreground">{t("analytics.conversationOnly", "Conversation Only")}</p>
+            <p className="font-mono text-lg font-semibold text-foreground">
               {hasConversationTokenData
                 ? formatNumber(conversationTokenValue)
                 : t("common.dash", "—")}
             </p>
             {hasCostData && (
-              <p className="font-mono text-[11px] text-muted-foreground">
+              <p className="font-mono text-sm text-muted-foreground">
                 {hasConversationCostData
                   ? formatCurrency(conversationCostValue)
                   : t("common.dash", "—")}
               </p>
             )}
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {hasConversationTokenData
                 ? `${conversationTokenRatio.toFixed(1)}%`
                 : t("analytics.calculating", "Calculating")}
             </p>
           </div>
-          <div className="p-3 rounded-lg bg-muted/30">
-            <p className="text-[11px] text-muted-foreground">{t("analytics.nonConversation", "Non-conversation")}</p>
-            <p className="font-mono text-[14px] font-semibold text-foreground">
+          <div className="p-4 rounded-lg bg-muted/30">
+            <p className="text-sm text-muted-foreground">{t("analytics.nonConversation", "Non-conversation")}</p>
+            <p className="font-mono text-lg font-semibold text-foreground">
               {hasConversationTokenData
                 ? formatNumber(nonConversationTokenValue)
                 : t("common.dash", "—")}
             </p>
             {hasCostData && (
-              <p className="font-mono text-[11px] text-muted-foreground">
+              <p className="font-mono text-sm text-muted-foreground">
                 {hasConversationCostData
                   ? formatCurrency(nonConversationCostValue)
                   : t("common.dash", "—")}
               </p>
             )}
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {hasConversationTokenData
                 ? `${nonConversationTokenRatio.toFixed(1)}%`
                 : t("analytics.calculating", "Calculating")}

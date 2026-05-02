@@ -78,7 +78,7 @@ export const DailyTrendChart: React.FC<DailyTrendChartProps> = ({ dailyData }) =
                 />
               </div>
               <span
-                className="text-[9px] font-mono tabular-nums mt-1 whitespace-nowrap"
+                className="text-3xs font-mono tabular-nums mt-1 whitespace-nowrap"
                 style={{
                   fontWeight: isToday ? 600 : 400,
                   color: isToday ? "#22c55e" : "var(--muted-foreground)",
@@ -105,7 +105,7 @@ export const DailyTrendChart: React.FC<DailyTrendChartProps> = ({ dailyData }) =
       )}
 
       {/* Summary row */}
-      <div className="flex items-center justify-between text-[10px] pt-2 border-t border-border/20">
+      <div className="flex items-center justify-between text-xs pt-2 border-t border-border/20">
         <div className="flex items-center gap-4">
           <div>
             <span className="text-muted-foreground">{t("analytics.dailyAvgTokens")}: </span>

@@ -796,7 +796,7 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
                   <span>{tab.label}</span>
                   <span
                     className={cn(
-                      "px-1 py-0.5 rounded text-[10px] font-mono leading-none",
+                      "px-1 py-0.5 rounded text-xs font-mono leading-none",
                       isActive ? "bg-accent/20 text-accent" : "bg-muted text-muted-foreground"
                     )}
                   >

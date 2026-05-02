@@ -128,7 +128,7 @@ const MonthBlock: React.FC<{
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="text-[10px] font-semibold text-foreground/80 mb-0.5">
+      <div className="text-xs font-semibold text-foreground/80 mb-0.5">
         {monthLabel}
       </div>
 
@@ -136,7 +136,7 @@ const MonthBlock: React.FC<{
         {weekdayLabels.map((label, i) => (
           <div
             key={i}
-            className="w-[14px] h-[14px] flex items-center justify-center text-[8px] font-medium text-muted-foreground/50"
+            className="w-[14px] h-[14px] flex items-center justify-center text-4xs font-medium text-muted-foreground/50"
           >
             {label}
           </div>
@@ -249,7 +249,7 @@ export const ActivityHeatmapComponent: React.FC<ActivityHeatmapProps> = React.me
 
       <div className="flex items-center justify-between pt-3 border-t border-border/30">
         <div className="flex items-center gap-2">
-          <span className="text-[9px] font-medium text-muted-foreground">
+          <span className="text-3xs font-medium text-muted-foreground">
             {t("analytics.legend.less")}
           </span>
           <div className="flex gap-0.5">
@@ -261,12 +261,12 @@ export const ActivityHeatmapComponent: React.FC<ActivityHeatmapProps> = React.me
               />
             ))}
           </div>
-          <span className="text-[9px] font-medium text-muted-foreground">
+          <span className="text-3xs font-medium text-muted-foreground">
             {t("analytics.legend.more")}
           </span>
         </div>
 
-        <span className="text-[9px] font-mono text-muted-foreground">
+        <span className="text-3xs font-mono text-muted-foreground">
           {t("analytics.calendarTotal", { count: totalMessages })}
         </span>
       </div>

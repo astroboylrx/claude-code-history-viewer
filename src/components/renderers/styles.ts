@@ -218,13 +218,13 @@ export const layout = {
   /** Small icon size (for status indicators) */
   iconSizeSmall: "w-3 h-3",
   /** Title text style */
-  titleText: "text-[12px] font-medium",
+  titleText: "text-sm font-medium",
   /** Body text style */
-  bodyText: "text-[12px]",
+  bodyText: "text-sm",
   /** Small/meta text style */
-  smallText: "text-[12px]",
+  smallText: "text-sm",
   /** Monospace text */
-  monoText: "text-[12px] font-mono",
+  monoText: "text-sm font-mono",
   /** Standard border radius */
   rounded: "rounded-md",
   /** Code block max height */

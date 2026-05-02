@@ -382,7 +382,7 @@ export const AppLayout: React.FC<AppLayoutProps> = (props) => {
                     )}
                   </div>
                   <div>
-                    <h2 className="text-sm font-semibold text-foreground">
+                    <h2 className="text-base font-semibold text-foreground">
                       {isViewingGlobalStats
                         ? t("analytics.globalOverview")
                         : computed.isArchiveView

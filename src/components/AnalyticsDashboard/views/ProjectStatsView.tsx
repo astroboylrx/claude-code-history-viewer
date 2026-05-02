@@ -152,7 +152,7 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
           {projectSummary.daily_stats.length > 0 ? (
             <ActivityHeatmapComponent data={projectSummary.daily_stats} />
           ) : (
-            <div className="text-center py-8 text-muted-foreground text-[12px]">
+            <div className="text-center py-8 text-muted-foreground text-sm">
               {t("analytics.No activity data available")}
             </div>
           )}
@@ -196,14 +196,14 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
                 return (
                   <div key={model.model_name}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="block max-w-[60%] text-[12px] font-medium text-foreground truncate">
+                      <span className="block max-w-[60%] text-sm font-medium text-foreground truncate">
                         {model.model_name}
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[12px] text-muted-foreground">
+                        <span className="font-mono text-sm text-muted-foreground">
                           {formattedPrice}
                         </span>
-                        <span className="font-mono text-[12px] font-semibold text-foreground">
+                        <span className="font-mono text-sm font-semibold text-foreground">
                           {formattedTokens}
                         </span>
                       </div>

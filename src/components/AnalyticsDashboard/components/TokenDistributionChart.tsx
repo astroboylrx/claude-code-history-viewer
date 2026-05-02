@@ -123,7 +123,7 @@ export const TokenDistributionChart: React.FC<TokenDistributionChartProps> = ({
               <div className="font-mono text-lg font-bold tabular-nums" style={{ color: arcs[hoveredIdx].color }}>
                 {formatNumber(arcs[hoveredIdx].value)}
               </div>
-              <div className="text-[9px] font-medium text-muted-foreground">
+              <div className="text-3xs font-medium text-muted-foreground">
                 {arcs[hoveredIdx].label} ({(arcs[hoveredIdx].percentage * 100).toFixed(1)}%)
               </div>
             </>
@@ -132,7 +132,7 @@ export const TokenDistributionChart: React.FC<TokenDistributionChartProps> = ({
               <div className="font-mono text-2xl font-bold text-foreground tabular-nums">
                 {formatNumber(total)}
               </div>
-              <div className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider mt-1">
+              <div className="text-3xs font-medium text-muted-foreground uppercase tracking-wider mt-1">
                 {t("analytics.totalTokenUsage")}
               </div>
             </>
@@ -167,10 +167,10 @@ export const TokenDistributionChart: React.FC<TokenDistributionChartProps> = ({
               {/* Label & Bar */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline justify-between mb-1">
-                  <span className="text-[11px] font-medium text-foreground/80 truncate">
+                  <span className="text-xs font-medium text-foreground/80 truncate">
                     {item.label}
                   </span>
-                  <span className="font-mono text-[10px] text-muted-foreground ml-2 tabular-nums">
+                  <span className="font-mono text-xs text-muted-foreground ml-2 tabular-nums">
                     {percentage.toFixed(1)}%
                   </span>
                 </div>

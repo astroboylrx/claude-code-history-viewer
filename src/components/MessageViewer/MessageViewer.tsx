@@ -828,7 +828,7 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
             <span className="text-xs font-medium text-muted-foreground">
               {t("renderers.agentTool.subagentSessions", { defaultValue: "SubAgent Sessions" })}
             </span>
-            <span className="text-[10px] text-muted-foreground/70 bg-muted rounded-full px-1.5">
+            <span className="text-xs text-muted-foreground/70 bg-muted rounded-full px-1.5">
               {subagentSessions.length}
             </span>
           </div>
@@ -849,7 +849,7 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
                 <span className="max-w-[200px] truncate">
                   {sa.summary ?? sa.agent_id}
                 </span>
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   {t("renderers.agentTool.messages", { count: sa.message_count, defaultValue: "{{count}} messages" })}
                 </span>
               </button>
