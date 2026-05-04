@@ -103,6 +103,7 @@ pub struct ProjectRanking {
     pub sessions: u32,
     pub messages: u32,
     pub tokens: u64,
+    pub provider_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -6,6 +6,7 @@
  */
 
 import React, { useMemo, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { DailyStats } from "../../../types";
@@ -127,16 +128,16 @@ const MonthBlock: React.FC<{
   const monthLabel = formatMonthLabel(yearMonth);
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-0.5">
       <div className="text-xs font-semibold text-foreground/80 mb-0.5">
         {monthLabel}
       </div>
 
-      <div className="grid grid-cols-7 gap-px">
+      <div className="grid grid-cols-7 gap-0.5">
         {weekdayLabels.map((label, i) => (
           <div
             key={i}
-            className="w-[14px] h-[14px] flex items-center justify-center text-4xs font-medium text-muted-foreground/50"
+            className="w-5 h-5 flex items-center justify-center text-4xs font-medium text-muted-foreground/50"
           >
             {label}
           </div>
@@ -144,10 +145,10 @@ const MonthBlock: React.FC<{
       </div>
 
       {weeks.map((week, weekIdx) => (
-        <div key={weekIdx} className="grid grid-cols-7 gap-px">
+        <div key={weekIdx} className="grid grid-cols-7 gap-0.5">
           {week.map((cell, dayIdx) => {
             if (cell.date == null) {
-              return <div key={dayIdx} className="w-[14px] h-[14px]" />;
+              return <div key={dayIdx} className="w-5 h-5" />;
             }
 
             const intensity = maxActivity > 0 ? cell.messageCount / maxActivity : 0;
@@ -157,7 +158,7 @@ const MonthBlock: React.FC<{
               <div
                 key={dayIdx}
                 className={cn(
-                  "w-[14px] h-[14px] rounded-sm",
+                  "w-5 h-5 rounded-sm",
                   intensity > 0 && "cursor-pointer hover:scale-125 hover:z-10 hover:ring-1 hover:ring-white/30"
                 )}
                 style={{ backgroundColor: heatColor }}
@@ -165,7 +166,7 @@ const MonthBlock: React.FC<{
                 onMouseLeave={() => onHover(null, null)}
               >
                 {cell.dayNum === 1 && (
-                  <span className="text-[6px] text-foreground/40 leading-none flex items-center justify-center h-full">
+                  <span className="text-3xs text-foreground/40 leading-none flex items-center justify-center h-full">
                     1
                   </span>
                 )}
@@ -235,7 +236,7 @@ export const ActivityHeatmapComponent: React.FC<ActivityHeatmapProps> = React.me
         ))}
       </div>
 
-      {hoveredCell?.date && tooltipStyle && (
+      {hoveredCell?.date && tooltipStyle && createPortal(
         <div
           style={tooltipStyle}
           className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-xs shadow-lg"
@@ -244,7 +245,8 @@ export const ActivityHeatmapComponent: React.FC<ActivityHeatmapProps> = React.me
           <div>{t("analytics.tooltip.messages")}: {hoveredCell.messageCount}</div>
           <div>{t("analytics.tooltip.sessions")}: {hoveredCell.sessionCount}</div>
           <div>{t("analytics.tooltip.tokens")}: {formatNumber(hoveredCell.totalTokens)}</div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <div className="flex items-center justify-between pt-3 border-t border-border/30">

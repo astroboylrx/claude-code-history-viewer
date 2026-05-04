@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "./store/useAppStore";
@@ -164,7 +164,8 @@ function App() {
   }, [activeProviders, t]);
 
   // Local state
-  const [isViewingGlobalStats, setIsViewingGlobalStats] = useState(false);
+  const isViewingGlobalStats = useAppStore((s) => s.isViewingGlobalStats);
+  const setIsViewingGlobalStats = useAppStore((s) => s.setIsViewingGlobalStats);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -292,8 +293,25 @@ function App() {
          console.error(`Failed to auto-load ${activeView} view:`, error);
        }
      },
-     [clearProjectSelection, selectProject, analyticsActions, setDateFilter]
-   );
+      [clearProjectSelection, selectProject, analyticsActions, setDateFilter]
+    );
+
+  // Handle pending project navigation from other components (e.g. GlobalStatsView)
+  useEffect(() => {
+    const pending = useAppStore.getState().pendingProjectNavigation;
+    if (pending) {
+      useAppStore.getState().clearPendingProjectNavigation();
+      handleProjectSelect(pending);
+    }
+    const unsub = useAppStore.subscribe((state) => {
+      if (state.pendingProjectNavigation) {
+        const project = state.pendingProjectNavigation;
+        useAppStore.getState().clearPendingProjectNavigation();
+        handleProjectSelect(project);
+      }
+    });
+    return unsub;
+  }, [handleProjectSelect]);
 
   const handleSessionHover = useCallback(
     (session: ClaudeSession) => {

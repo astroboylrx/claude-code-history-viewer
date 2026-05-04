@@ -5,6 +5,7 @@
  */
 
 import type { GlobalStatsSummary } from "../../types";
+import type { ClaudeProject } from "../../types/core/session";
 import { AppErrorType } from "../../types";
 import type { StateCreator } from "zustand";
 import { toast } from "sonner";
@@ -21,11 +22,16 @@ export interface GlobalStatsSliceState {
   globalSummary: GlobalStatsSummary | null;
   globalConversationSummary: GlobalStatsSummary | null;
   isLoadingGlobalStats: boolean;
+  isViewingGlobalStats: boolean;
+  pendingProjectNavigation: ClaudeProject | null;
 }
 
 export interface GlobalStatsSliceActions {
   loadGlobalStats: () => Promise<void>;
   clearGlobalStats: () => void;
+  setIsViewingGlobalStats: (value: boolean) => void;
+  requestProjectNavigation: (project: ClaudeProject) => void;
+  clearPendingProjectNavigation: () => void;
 }
 
 export type GlobalStatsSlice = GlobalStatsSliceState & GlobalStatsSliceActions;
@@ -38,6 +44,8 @@ const initialGlobalStatsState: GlobalStatsSliceState = {
   globalSummary: null,
   globalConversationSummary: null,
   isLoadingGlobalStats: false,
+  isViewingGlobalStats: false,
+  pendingProjectNavigation: null,
 };
 
 // ============================================================================
@@ -137,12 +145,23 @@ export const createGlobalStatsSlice: StateCreator<
   },
 
   clearGlobalStats: () => {
-    // Bump the request ID so any in-flight global stats requests are invalidated.
     nextRequestId("globalStats");
     set({
       globalSummary: null,
       globalConversationSummary: null,
       isLoadingGlobalStats: false,
     });
+  },
+
+  setIsViewingGlobalStats: (value: boolean) => {
+    set({ isViewingGlobalStats: value });
+  },
+
+  requestProjectNavigation: (project: ClaudeProject) => {
+    set({ pendingProjectNavigation: project });
+  },
+
+  clearPendingProjectNavigation: () => {
+    set({ pendingProjectNavigation: null });
   },
 });

@@ -4,7 +4,7 @@
  * Displays global statistics across all projects.
  */
 
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Activity,
@@ -37,6 +37,7 @@ import {
 } from "../utils";
 import { calculateConversationBreakdownCoverage } from "../../../utils/providers";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
+import { useAppStore } from "../../../store/useAppStore";
 
 interface GlobalStatsViewProps {
   globalSummary: GlobalStatsSummary;
@@ -48,6 +49,17 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
   globalConversationSummary,
 }) => {
   const { t } = useTranslation();
+  const projects = useAppStore((s) => s.projects);
+
+  const handleProjectClick = useCallback((projectName: string, providerId: string) => {
+    const project = projects.find((p) => {
+      const nameMatch = p.name === projectName || p.actual_path === projectName || p.path === projectName;
+      if (!nameMatch) return false;
+      return (p.provider ?? "claude") === providerId;
+    });
+    if (!project) return;
+    useAppStore.getState().requestProjectNavigation(project);
+  }, [projects]);
   const totalSessionTime = globalSummary.total_session_duration_minutes;
   const costSummary = useMemo(
     () =>
@@ -225,13 +237,6 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
           </SectionCard>
         )}
 
-        <SectionCard
-          title={t("analytics.mostUsedToolsTitle")}
-          icon={Wrench}
-          colorVariant="amber"
-        >
-          <ToolUsageChart tools={globalSummary.most_used_tools} />
-        </SectionCard>
       </div>
 
       {/* Heatmap & Top Projects */}
@@ -253,11 +258,12 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
                 const medal = getRankMedal(index);
                 return (
                   <div
-                    key={project.project_name}
+                    key={`${project.project_name}-${project.provider_id}`}
                     className={cn(
-                      "flex items-center justify-between p-2.5 rounded-lg",
+                      "flex items-center justify-between p-2.5 rounded-lg cursor-pointer",
                       "bg-muted/30 hover:bg-muted/50 transition-colors"
                     )}
+                    onClick={() => handleProjectClick(project.project_name, project.provider_id)}
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div
@@ -271,26 +277,40 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
                       <div className="flex-1 min-w-0">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              className="block w-full text-sm font-medium text-foreground truncate text-left cursor-default"
+                            <span
+                              className="block w-full text-sm font-medium text-foreground truncate"
                             >
                               {project.project_name}
-                            </button>
+                            </span>
                           </TooltipTrigger>
                           <TooltipContent>
                             {project.project_name}
                           </TooltipContent>
                         </Tooltip>
-                        <p className="text-sm text-muted-foreground">
-                          {t(
-                            "analytics.topProjectMeta",
-                            "{{sessions}} sessions • {{messages}} msgs",
-                            {
-                              sessions: project.sessions,
-                              messages: project.messages,
-                            }
-                          )}
+                        <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={cn(
+                              "inline-flex px-1.5 py-0.5 text-2xs font-medium rounded-full leading-none",
+                              project.provider_id === "claude" && "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+                              project.provider_id === "codex" && "bg-green-500/15 text-green-600 dark:text-green-400",
+                              project.provider_id === "kimi" && "bg-orange-500/15 text-orange-600 dark:text-orange-400",
+                              project.provider_id === "opencode" && "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+                              project.provider_id === "gemini" && "bg-purple-500/15 text-purple-600 dark:text-purple-400",
+                              project.provider_id === "cline" && "bg-teal-500/15 text-teal-600 dark:text-teal-400",
+                            )}
+                          >
+                            {project.provider_id}
+                          </span>
+                          <span>
+                            {t(
+                              "analytics.topProjectMeta",
+                              "{{sessions}} sessions • {{messages}} msgs",
+                              {
+                                sessions: project.sessions,
+                                messages: project.messages,
+                              }
+                            )}
+                          </span>
                         </p>
                       </div>
                     </div>
@@ -306,6 +326,17 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
             </div>
           </SectionCard>
         )}
+      </div>
+
+      {/* Most Used Tools */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+        <SectionCard
+          title={t("analytics.mostUsedToolsTitle")}
+          icon={Wrench}
+          colorVariant="amber"
+        >
+          <ToolUsageChart tools={globalSummary.most_used_tools} />
+        </SectionCard>
       </div>
     </div>
   );

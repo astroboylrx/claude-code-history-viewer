@@ -141,16 +141,17 @@ export function useResizablePanel({
       }
     };
 
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("blur", handleMouseUp);
 
-    // Prevent text selection during drag and show resize cursor
     document.body.style.userSelect = "none";
     document.body.style.cursor = "col-resize";
 
     return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("blur", handleMouseUp);
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
     };

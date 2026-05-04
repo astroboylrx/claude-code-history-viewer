@@ -370,13 +370,12 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
       const isCurrentlySelected = selectedProject?.path === project.path;
 
       if (isCurrentlySelected) {
-        // Deselecting: also collapse
+        // Collapse only, keep project selected so dashboard stays visible
         setExpandedProjects((prev) => {
           const next = new Set(prev);
           next.delete(project.path);
           return next;
         });
-        onProjectSelect(project);
       } else {
         // Selecting new project: defer expansion to avoid blocking IPC responses
         onProjectSelect(project);

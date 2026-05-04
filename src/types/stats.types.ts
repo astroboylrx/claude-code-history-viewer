@@ -123,6 +123,7 @@ export interface ProjectRanking {
   sessions: number;
   messages: number;
   tokens: number;
+  provider_id: string;
 }
 
 export interface ProviderUsageStats {

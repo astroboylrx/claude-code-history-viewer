@@ -392,6 +392,14 @@ fn track_tool_usage_from_global_entry(
     }
 }
 
+fn is_valid_model_name(name: &str) -> bool {
+    !name.starts_with('<') || !name.ends_with('>')
+}
+
+fn is_subagent_path(path: &PathBuf) -> bool {
+    path.to_str().map_or(false, |s| s.contains("/subagents/"))
+}
+
 /// Intermediate stats collected from a single session file (for parallel processing)
 #[derive(Default)]
 struct SessionFileStats {
@@ -424,12 +432,8 @@ fn process_session_file_for_global_stats(
     // for the duration of the mmap's lifetime. Session files are append-only.
     let mmap = unsafe { Mmap::map(&file) }.ok()?;
 
-    let project_name = session_path
-        .parent()
-        .and_then(|p| p.file_name())
-        .and_then(|n| n.to_str())
-        .unwrap_or("Unknown")
-        .to_string();
+    let project_dir = session_path.parent().unwrap_or(session_path);
+    let project_name = resolve_provider_project_name(StatsProvider::Claude, &project_dir.to_string_lossy());
 
     let mut stats = SessionFileStats {
         project_name,
@@ -480,16 +484,18 @@ fn process_session_file_for_global_stats(
         stats.token_distribution.cache_read += cache_read_tokens;
         if let Some(msg) = &entry.message {
             if let Some(model_name) = &msg.model {
-                let model_entry = stats
-                    .model_usage
-                    .entry(model_name.clone())
-                    .or_insert((0, 0, 0, 0, 0, 0));
-                model_entry.0 += 1;
-                model_entry.1 += tokens;
-                model_entry.2 += input_tokens;
-                model_entry.3 += output_tokens;
-                model_entry.4 += cache_creation_tokens;
-                model_entry.5 += cache_read_tokens;
+                if is_valid_model_name(model_name) {
+                    let model_entry = stats
+                        .model_usage
+                        .entry(model_name.clone())
+                        .or_insert((0, 0, 0, 0, 0, 0));
+                    model_entry.0 += 1;
+                    model_entry.1 += tokens;
+                    model_entry.2 += input_tokens;
+                    model_entry.3 += output_tokens;
+                    model_entry.4 += cache_creation_tokens;
+                    model_entry.5 += cache_read_tokens;
+                }
             }
         }
 
@@ -626,16 +632,18 @@ fn build_global_session_file_stats_from_messages(
         stats.token_distribution.cache_creation += cache_creation_tokens;
         stats.token_distribution.cache_read += cache_read_tokens;
         if let Some(model_name) = &message.model {
-            let model_entry = stats
-                .model_usage
-                .entry(model_name.clone())
-                .or_insert((0, 0, 0, 0, 0, 0));
-            model_entry.0 += 1;
-            model_entry.1 += tokens;
-            model_entry.2 += input_tokens;
-            model_entry.3 += output_tokens;
-            model_entry.4 += cache_creation_tokens;
-            model_entry.5 += cache_read_tokens;
+            if is_valid_model_name(model_name) {
+                let model_entry = stats
+                    .model_usage
+                    .entry(model_name.clone())
+                    .or_insert((0, 0, 0, 0, 0, 0));
+                model_entry.0 += 1;
+                model_entry.1 += tokens;
+                model_entry.2 += input_tokens;
+                model_entry.3 += output_tokens;
+                model_entry.4 += cache_creation_tokens;
+                model_entry.5 += cache_read_tokens;
+            }
         }
 
         if let Some(timestamp) = parsed_timestamp {
@@ -734,7 +742,7 @@ fn collect_provider_global_file_stats(
     let mut session_tasks: Vec<(String, String)> = Vec::new();
 
     for project in projects {
-        let project_display_name = format!("{} [{}]", project.name, provider_tag);
+        let project_display_name = project.name.clone();
         project_keys.insert(format!("{provider_tag}:{}", project.path));
 
         let sessions = match provider {
@@ -874,16 +882,18 @@ fn process_session_file_for_project_stats(
 
                 // Track model usage
                 if let Some(ref model_name) = message.model {
-                    let model_entry = stats
-                        .model_usage
-                        .entry(model_name.clone())
-                        .or_insert((0, 0, 0, 0, 0, 0));
-                    model_entry.0 += 1;
-                    model_entry.1 += input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens;
-                    model_entry.2 += input_tokens;
-                    model_entry.3 += output_tokens;
-                    model_entry.4 += cache_creation_tokens;
-                    model_entry.5 += cache_read_tokens;
+                    if is_valid_model_name(model_name) {
+                        let model_entry = stats
+                            .model_usage
+                            .entry(model_name.clone())
+                            .or_insert((0, 0, 0, 0, 0, 0));
+                        model_entry.0 += 1;
+                        model_entry.1 += input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens;
+                        model_entry.2 += input_tokens;
+                        model_entry.3 += output_tokens;
+                        model_entry.4 += cache_creation_tokens;
+                        model_entry.5 += cache_read_tokens;
+                    }
                 }
             }
         }
@@ -1107,20 +1117,39 @@ fn build_tool_usage_stats(tool_usage: HashMap<String, (u32, u32)>) -> Vec<ToolUs
 
 fn resolve_provider_project_name(provider: StatsProvider, project_path: &str) -> String {
     match provider {
-        StatsProvider::Claude => PathBuf::from(project_path)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("Unknown")
-            .to_string(),
+        StatsProvider::Claude => {
+            let decoded = crate::utils::decode_project_path(project_path);
+            let name = if decoded != project_path {
+                decoded
+            } else {
+                PathBuf::from(project_path)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("Unknown")
+                    .to_string()
+            };
+            let home = std::env::var("HOME").unwrap_or_default();
+            if !home.is_empty() && name.starts_with(&home) {
+                format!("~{}", &name[home.len()..])
+            } else {
+                name
+            }
+        }
         StatsProvider::Codex => {
+            if let Ok(projects) = providers::codex::scan_projects() {
+                if let Some(project) = projects.into_iter().find(|p| p.path == project_path) {
+                    return project.name;
+                }
+            }
             let cwd = project_path
                 .strip_prefix("codex://")
                 .unwrap_or(project_path);
-            PathBuf::from(cwd)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(cwd)
-                .to_string()
+            let home = std::env::var("HOME").unwrap_or_default();
+            if cwd.starts_with(&home) && !home.is_empty() {
+                format!("~{}", &cwd[home.len()..])
+            } else {
+                cwd.to_string()
+            }
         }
         StatsProvider::OpenCode => {
             if let Ok(projects) = providers::opencode::scan_projects() {
@@ -1180,7 +1209,13 @@ fn resolve_provider_project_name_from_session(
             }
             "codex".to_string()
         }
-        StatsProvider::Claude => "unknown".to_string(),
+        StatsProvider::Claude => {
+            let project_path = std::path::Path::new(session_path)
+                .parent()
+                .and_then(|p| p.to_str())
+                .unwrap_or(session_path);
+            resolve_provider_project_name(provider, project_path)
+        }
     }
 }
 
@@ -1410,15 +1445,17 @@ fn get_provider_project_stats_summary(
             summary.token_distribution.cache_read += cache_read_tokens;
 
             if let Some(ref model_name) = message.model {
-                let model_entry = model_usage_map
-                    .entry(model_name.clone())
-                    .or_insert((0, 0, 0, 0, 0, 0));
-                model_entry.0 += 1;
-                model_entry.1 += total_tokens;
-                model_entry.2 += input_tokens;
-                model_entry.3 += output_tokens;
-                model_entry.4 += cache_creation_tokens;
-                model_entry.5 += cache_read_tokens;
+                if is_valid_model_name(model_name) {
+                    let model_entry = model_usage_map
+                        .entry(model_name.clone())
+                        .or_insert((0, 0, 0, 0, 0, 0));
+                    model_entry.0 += 1;
+                    model_entry.1 += total_tokens;
+                    model_entry.2 += input_tokens;
+                    model_entry.3 += output_tokens;
+                    model_entry.4 += cache_creation_tokens;
+                    model_entry.5 += cache_read_tokens;
+                }
             }
 
             if let Some(timestamp) = parsed_ts {
@@ -1764,12 +1801,8 @@ fn extract_session_token_stats_sync(
     // for the duration of the mmap's lifetime. Session files are append-only.
     let mmap = unsafe { Mmap::map(&file) }.ok()?;
 
-    let project_name = session_path
-        .parent()
-        .and_then(|p| p.file_name())
-        .and_then(|n| n.to_str())
-        .unwrap_or("Unknown")
-        .to_string();
+    let project_dir = session_path.parent().unwrap_or(session_path);
+    let project_name = resolve_provider_project_name(StatsProvider::Claude, &project_dir.to_string_lossy());
 
     let mut session_id: Option<String> = None;
     let mut total_input_tokens = 0u64;
@@ -1931,9 +1964,9 @@ pub async fn get_project_token_stats(
         .into_iter()
         .filter_map(std::result::Result::ok)
         .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("jsonl"))
+        .filter(|e| !is_subagent_path(&e.path().to_path_buf()))
         .map(|e| e.path().to_path_buf())
         .collect();
-
     #[cfg(debug_assertions)]
     let scan_time = start.elapsed();
 
@@ -2013,11 +2046,10 @@ pub async fn get_project_stats_summary(
     }
 
     let start = std::time::Instant::now();
-    let project_name = PathBuf::from(&project_path)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("Unknown")
-        .to_string();
+    let project_name = resolve_provider_project_name(
+        detect_project_provider(&project_path),
+        &project_path,
+    );
 
     let s_limit = parse_date_limit(start_date, "start_date");
     let e_limit = parse_date_limit(end_date, "end_date");
@@ -2027,6 +2059,7 @@ pub async fn get_project_stats_summary(
         .into_iter()
         .filter_map(std::result::Result::ok)
         .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("jsonl"))
+        .filter(|e| !is_subagent_path(&e.path().to_path_buf()))
         .map(|e| e.path().to_path_buf())
         .collect();
     let scan_time = start.elapsed();
@@ -2344,6 +2377,7 @@ pub async fn get_session_comparison(
         .into_iter()
         .filter_map(std::result::Result::ok)
         .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("jsonl"))
+        .filter(|e| !is_subagent_path(&e.path().to_path_buf()))
         .map(|e| e.path().to_path_buf())
         .collect();
     let scan_time = start.elapsed();
@@ -2539,6 +2573,7 @@ pub async fn get_global_stats_summary(
                         .into_iter()
                         .filter_map(std::result::Result::ok)
                         .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("jsonl"))
+                        .filter(|e| !is_subagent_path(&e.path().to_path_buf()))
                     {
                         session_files.push(entry.path().to_path_buf());
                     }
@@ -2604,7 +2639,7 @@ pub async fn get_global_stats_summary(
     let mut daily_stats_map: HashMap<String, DailyStats> = HashMap::new();
     let mut activity_map: HashMap<(u8, u8), (u32, u64)> = HashMap::new();
     let mut model_usage_map: HashMap<String, (u32, u64, u64, u64, u64, u64)> = HashMap::new();
-    let mut project_stats_map: HashMap<String, (u32, u32, u64)> = HashMap::new();
+    let mut project_stats_map: HashMap<(String, String), (u32, u32, u64)> = HashMap::new();
     let mut provider_stats_map: HashMap<StatsProvider, (u32, u32, u64)> = HashMap::new();
     let mut provider_projects_map: HashMap<StatsProvider, HashSet<String>> = HashMap::new();
     let mut global_first_message: Option<DateTime<Utc>> = None;
@@ -2677,7 +2712,8 @@ pub async fn get_global_stats_summary(
             .insert(project_name.clone());
 
         // Aggregate project stats
-        let project_entry = project_stats_map.entry(project_name).or_insert((0, 0, 0));
+        let provider_id = stats_provider_id(stats.provider).to_string();
+        let project_entry = project_stats_map.entry((project_name, provider_id)).or_insert((0, 0, 0));
         project_entry.0 += 1; // sessions
         project_entry.1 += stats.total_messages; // messages
         project_entry.2 += stats.total_tokens; // tokens
@@ -2763,11 +2799,12 @@ pub async fn get_global_stats_summary(
     summary.top_projects = project_stats_map
         .into_iter()
         .map(
-            |(project_name, (sessions, messages, tokens))| ProjectRanking {
+            |((project_name, provider_id), (sessions, messages, tokens))| ProjectRanking {
                 project_name,
                 sessions,
                 messages,
                 tokens,
+                provider_id,
             },
         )
         .collect();
