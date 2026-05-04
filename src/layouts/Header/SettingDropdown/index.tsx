@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { Settings, RefreshCw, MessageSquare, Folder, Loader2 } from "lucide-react";
+import { Settings, MessageSquare, Folder, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -73,26 +73,6 @@ export const SettingDropdown = ({ updater }: SettingDropdownProps) => {
 
           <DropdownMenuSeparator />
           <LanguageMenuGroup />
-
-          <DesktopOnly>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                window.dispatchEvent(new Event('manual-update-check'));
-              }}
-              disabled={updater.state.isChecking}
-            >
-              <RefreshCw
-                className={cn(
-                  "mr-2 h-4 w-4 text-foreground",
-                  updater.state.isChecking && "animate-spin"
-                )}
-              />
-              {updater.state.isChecking
-                ? t('common.settings.checking')
-                : t('common.settings.checkUpdate')}
-            </DropdownMenuItem>
-          </DesktopOnly>
         </DropdownMenuContent>
       </DropdownMenu>
     </>
