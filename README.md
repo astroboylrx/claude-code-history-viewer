@@ -33,18 +33,60 @@ Browse, search, and analyze conversations from **Claude Code**, **Codex CLI**, *
 - Shared tooltip system replacing per-element Radix Tooltip trees
 - Fixed 100% invisible arc in token distribution chart -->
 
-## macOS Install (via Homebrew)
+## Installation
 
-This fork does not have an Apple Developer certificate, so pre-built `.dmg` files will be blocked by Gatekeeper. Instead, build from source using Homebrew — the app compiles locally and installs directly to `/Applications`:
+### Linux
+
+Download the `.AppImage` from the [latest release](https://github.com/astroboylrx/claude-code-history-viewer/releases/latest):
 
 ```bash
-brew install --cask https://raw.githubusercontent.com/astroboylrx/claude-code-history-viewer/main/scripts/claude-code-history-viewer.rb
+chmod +x Claude*.AppImage
+./Claude*.AppImage
 ```
 
-To update after a new release:
+### Windows
+
+Download the installer (`.exe`) from the [latest release](https://github.com/astroboylrx/claude-code-history-viewer/releases/latest).
+
+### macOS (Build from Source)
+
+Because this app does not use a paid Apple Developer certificate, downloading a pre-compiled `.dmg` will cause macOS Gatekeeper to block it. To bypass this, you can compile the app locally on your machine in just a few steps.
+
+**1. Install build dependencies (if you don't have them)**
+
+You will need `pnpm` and `rust` installed. You can easily get them via Homebrew:
 
 ```bash
-brew reinstall --cask https://raw.githubusercontent.com/astroboylrx/claude-code-history-viewer/main/scripts/claude-code-history-viewer.rb
+brew install node pnpm rust
+```
+
+**2. Download the source code**
+
+```bash
+git clone --depth 1 --branch v1.11.1 https://github.com/astroboylrx/claude-code-history-viewer.git
+cd claude-code-history-viewer
+```
+
+**3. Install packages & build the app**
+
+```bash
+pnpm install --frozen-lockfile
+pnpm tauri build --no-sign
+```
+
+**4. Move the app to your Applications folder**
+
+```bash
+cp -r "src-tauri/target/release/bundle/macos/Claude Code History Viewer.app" "/Applications/"
+```
+
+**5. Clean up (optional)**
+
+You can now safely delete the downloaded source code folder to free up space:
+
+```bash
+cd ..
+rm -rf claude-code-history-viewer
 ```
 
 ## Upstream

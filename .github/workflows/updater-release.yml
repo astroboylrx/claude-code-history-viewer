@@ -25,6 +25,23 @@ jobs:
         with:
           script: |
             const tag = `v${process.env.PACKAGE_VERSION}`;
+
+            // Clean up any stale draft releases for this tag (leftover from failed runs)
+            const { data: allReleases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const staleDrafts = allReleases.filter(r => r.tag_name === tag && r.draft === true);
+            for (const draft of staleDrafts) {
+              console.log(`Deleting stale draft release: ${draft.id}`);
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: draft.id,
+              });
+            }
+
             // Try to find existing release first
             try {
               const { data } = await github.rest.repos.getReleaseByTag({
