@@ -18,8 +18,8 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
-  # Quick format and lint check (runs in parallel with test)
-  lint:
+  tests:
+    if: false  # Disabled — not needed for fork
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
@@ -61,6 +61,7 @@ jobs:
   # Main test job - runs in parallel with lint
   # PR: Ubuntu only, Main: Ubuntu + macOS
   test:
+    if: false  # Disabled — not needed for fork
     name: Test Suite
     runs-on: ${{ matrix.os }}
     strategy:
@@ -112,6 +113,7 @@ jobs:
 
   # Code coverage - main branch only
   coverage:
+    if: false  # Disabled — not needed for fork
     name: Code Coverage
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -169,6 +171,7 @@ jobs:
 
   # Benchmark tests - main branch only
   benchmark:
+    if: false  # Disabled — not needed for fork
     name: Benchmarks
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -208,6 +211,7 @@ jobs:
 
   # Security audit - main branch only (weekly via schedule recommended)
   security:
+    if: false  # Disabled — not needed for fork
     name: Security Audit
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -226,6 +230,7 @@ jobs:
 
   # Documentation check - main branch only
   docs:
+    if: false  # Disabled — not needed for fork
     name: Documentation
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
