@@ -74,6 +74,8 @@ pnpm install --frozen-lockfile
 pnpm tauri build --no-sign
 ```
 
+A Finder window may briefly appear during the build — this is normal and will close on its own after a few seconds.
+
 **4. Move the app to your Applications folder**
 
 ```bash

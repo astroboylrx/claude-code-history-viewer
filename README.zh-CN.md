@@ -21,6 +21,9 @@
 - **全局统计：可点击的热门项目** — 点击热门项目卡片中的项目即可导航到该项目
 - **提供商彩色徽章** — 热门项目列表中按提供商显示不同颜色徽章（琥珀色=claude，绿色=codex，橙色=kimi，蓝色=opencode）
 - **字体缩放支持** — 所有文本遵循字体缩放滑块设置（90%-130%）
+<!-- - **子代理会话过滤** — 从所有统计中排除子代理会话
+- **改进的活动热力图** — 更大的图块（20px），基于 Portal 的工具提示，将工具图表移至热力图下方
+-->
 
 <!-- ## Linux / WebKitGTK 修复
 
@@ -30,18 +33,62 @@
 - 使用共享工具提示系统替代每个元素的 Radix Tooltip 树
 - 修复了 Token 分布图中 100% 不可见的圆弧 -->
 
-## macOS 安装（通过 Homebrew）
+## 安装
 
-此分支没有 Apple 开发者证书，因此预构建的 `.dmg` 文件会被 Gatekeeper 阻止。请使用 Homebrew 从源码构建 — 应用在本地编译并直接安装到 `/Applications`：
+### Linux
+
+从[最新发布](https://github.com/astroboylrx/claude-code-history-viewer/releases/latest)下载 `.AppImage`：
 
 ```bash
-brew install --cask https://raw.githubusercontent.com/astroboylrx/claude-code-history-viewer/main/scripts/claude-code-history-viewer.rb
+chmod +x Claude*.AppImage
+./Claude*.AppImage
 ```
 
-新版本发布后更新：
+### Windows
+
+从[最新发布](https://github.com/astroboylrx/claude-code-history-viewer/releases/latest)下载安装程序（`.exe`）。
+
+### macOS（从源码构建）
+
+由于此应用未使用付费的 Apple Developer 证书，下载预编译的 `.dmg` 会被 macOS Gatekeeper 阻止。要绕过此限制，只需几个步骤即可在本地编译应用。
+
+**1. 安装构建依赖（如果尚未安装）**
+
+需要安装 `pnpm` 和 `rust`。可以通过 Homebrew 轻松安装：
 
 ```bash
-brew reinstall --cask https://raw.githubusercontent.com/astroboylrx/claude-code-history-viewer/main/scripts/claude-code-history-viewer.rb
+brew install node pnpm rust
+```
+
+**2. 下载源代码**
+
+```bash
+git clone --depth 1 --branch v1.11.1 https://github.com/astroboylrx/claude-code-history-viewer.git
+cd claude-code-history-viewer
+```
+
+**3. 安装包并构建应用**
+
+```bash
+pnpm install --frozen-lockfile
+pnpm tauri build --no-sign
+```
+
+构建过程中可能会短暂出现 Finder 窗口 — 这是正常现象，几秒后会自动关闭。
+
+**4. 将应用移至应用程序文件夹**
+
+```bash
+cp -r "src-tauri/target/release/bundle/macos/Claude Code History Viewer.app" "/Applications/"
+```
+
+**5. 清理（可选）**
+
+可以安全删除下载的源代码文件夹以释放空间：
+
+```bash
+cd ..
+rm -rf claude-code-history-viewer
 ```
 
 ## 上游项目

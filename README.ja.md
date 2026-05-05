@@ -21,6 +21,9 @@
 - **グローバル統計：クリック可能なトッププロジェクト** — トッププロジェクトカードのプロジェクトをクリックしてナビゲーション
 - **プロバイダー別カラーバッジ** — トッププロジェクトリストのプロバイダー別バッジ（アンバー=claude、グリーン=codex、オレンジ=kimi、ブルー=opencode）
 - **フォントスケール対応** — すべてのテキストがフォントスケールスライダー（90%-130%）に従います
+<!-- - **サブエージェントセッションフィルタリング** — すべての統計からサブエージェントセッションを除外
+- **改善されたアクティビティヒートマップ** — 大きなタイル（20px）、ポータルベースのツールチップ、ヒートマップの下にツールチャートを移動
+-->
 
 <!-- ## Linux / WebKitGTK 修正
 
@@ -30,18 +33,62 @@
 - 要素ごとの Radix Tooltip ツリーを共有ツールチップシステムに置き換え
 - トークン分布チャートの 100% 不可視アークを修正 -->
 
-## macOS インストール（Homebrew 経由）
+## インストール
 
-このフォークには Apple Developer 証明書がないため、プレビルドの `.dmg` ファイルは Gatekeeper でブロックされます。Homebrew を使用してソースからビルドしてください — アプリはローカルでコンパイルされ、`/Applications` に直接インストールされます：
+### Linux
+
+[最新リリース](https://github.com/astroboylrx/claude-code-history-viewer/releases/latest)から `.AppImage` をダウンロードしてください：
 
 ```bash
-brew install --cask https://raw.githubusercontent.com/astroboylrx/claude-code-history-viewer/main/scripts/claude-code-history-viewer.rb
+chmod +x Claude*.AppImage
+./Claude*.AppImage
 ```
 
-新しいリリース後のアップデート：
+### Windows
+
+[最新リリース](https://github.com/astroboylrx/claude-code-history-viewer/releases/latest)からインストーラー（`.exe`）をダウンロードしてください。
+
+### macOS（ソースからビルド）
+
+このアプリは有料の Apple Developer 証明書を使用していないため、プレビルドの `.dmg` をダウンロードすると macOS Gatekeeper によってブロックされます。これを回避するには、いくつかの手順でローカルでアプリをコンパイルできます。
+
+**1. ビルド依存関係のインストール（未インストールの場合）**
+
+`pnpm` と `rust` が必要です。Homebrew で簡単にインストールできます：
 
 ```bash
-brew reinstall --cask https://raw.githubusercontent.com/astroboylrx/claude-code-history-viewer/main/scripts/claude-code-history-viewer.rb
+brew install node pnpm rust
+```
+
+**2. ソースコードのダウンロード**
+
+```bash
+git clone --depth 1 --branch v1.11.1 https://github.com/astroboylrx/claude-code-history-viewer.git
+cd claude-code-history-viewer
+```
+
+**3. パッケージのインストールとアプリのビルド**
+
+```bash
+pnpm install --frozen-lockfile
+pnpm tauri build --no-sign
+```
+
+ビルド中に Finder ウィンドウが一時的に表示されることがあります — これは正常であり、数秒後に自動的に閉じます。
+
+**4. アプリをアプリケーションフォルダに移動**
+
+```bash
+cp -r "src-tauri/target/release/bundle/macos/Claude Code History Viewer.app" "/Applications/"
+```
+
+**5. クリーンアップ（オプション）**
+
+ダウンロードしたソースコードフォルダを削除して容量を解放できます：
+
+```bash
+cd ..
+rm -rf claude-code-history-viewer
 ```
 
 ## アップストリーム
