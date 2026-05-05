@@ -10,6 +10,10 @@ Browse, search, and analyze conversations from **Claude Code**, **Codex CLI**, *
 
 </div>
 
+<div align="center">
+<img src="docs/assets/screenshot.png" alt="Screenshot" width="100%" />
+</div>
+
 ---
 
 ## Added Features
