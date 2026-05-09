@@ -296,6 +296,8 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
                               project.provider_id === "kimi" && "bg-orange-500/15 text-orange-600 dark:text-orange-400",
                               project.provider_id === "opencode" && "bg-blue-500/15 text-blue-600 dark:text-blue-400",
                               project.provider_id === "gemini" && "bg-purple-500/15 text-purple-600 dark:text-purple-400",
+                              project.provider_id === "forgecode" && "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+                              project.provider_id === "antigravity" && "bg-pink-500/15 text-pink-600 dark:text-pink-400",
                               project.provider_id === "cline" && "bg-teal-500/15 text-teal-600 dark:text-teal-400",
                             )}
                           >

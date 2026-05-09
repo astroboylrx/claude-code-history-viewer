@@ -1,14 +1,16 @@
 // src/components/ProjectContextMenu.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { EyeOff, Eye, Copy } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { computeMenuPosition, type Boundary } from "@/utils/contextMenu";
 import type { ClaudeProject } from "../types";
 
 interface ProjectContextMenuProps {
   project: ClaudeProject;
-  position: { x: number; y: number };
+  position: { x: number; y: number; boundary?: Boundary | null };
   onClose: () => void;
   onHide: (projectPath: string) => void;
   onUnhide: (projectPath: string) => void;
@@ -25,7 +27,7 @@ export const ProjectContextMenu: React.FC<ProjectContextMenuProps> = ({
 }) => {
   const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
-  const [adjustedPosition, setAdjustedPosition] = useState(position);
+  const [adjustedPosition, setAdjustedPosition] = useState({ x: position.x, y: position.y });
 
   // Close on click outside
   useEffect(() => {
@@ -49,23 +51,36 @@ export const ProjectContextMenu: React.FC<ProjectContextMenuProps> = ({
     };
   }, [onClose]);
 
-  // Adjust position if menu would go off-screen
+  // Close on scroll/resize (armed RAF — first event is ignored)
   useEffect(() => {
+    let armed = false;
+    let rafId: number;
+    const handler = () => {
+      if (!armed) {
+        armed = true;
+        return;
+      }
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => onClose());
+    };
+    window.addEventListener("scroll", handler, true);
+    window.addEventListener("resize", handler);
+    return () => {
+      window.removeEventListener("scroll", handler, true);
+      window.removeEventListener("resize", handler);
+      cancelAnimationFrame(rafId);
+    };
+  }, [onClose]);
+
+  // Adjust position using computeMenuPosition
+  useLayoutEffect(() => {
     if (menuRef.current) {
       const rect = menuRef.current.getBoundingClientRect();
-      const windowWidth = window.innerWidth;
-      const windowHeight = window.innerHeight;
-
-      let x = position.x;
-      let y = position.y;
-
-      if (x + rect.width > windowWidth) {
-        x = windowWidth - rect.width - 8;
-      }
-      if (y + rect.height > windowHeight) {
-        y = windowHeight - rect.height - 8;
-      }
-
+      const { x, y } = computeMenuPosition(
+        { x: position.x, y: position.y },
+        { width: rect.width, height: rect.height },
+        position.boundary,
+      );
       setAdjustedPosition({ x, y });
     }
   }, [position]);
@@ -102,7 +117,7 @@ export const ProjectContextMenu: React.FC<ProjectContextMenuProps> = ({
     "transition-colors cursor-pointer"
   );
 
-  return (
+  return createPortal(
     <div
       ref={menuRef}
       className={cn(
@@ -148,6 +163,7 @@ export const ProjectContextMenu: React.FC<ProjectContextMenuProps> = ({
           )}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

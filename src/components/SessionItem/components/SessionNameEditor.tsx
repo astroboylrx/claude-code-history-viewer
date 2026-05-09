@@ -39,6 +39,9 @@ export const SessionNameEditor: React.FC<SessionNameEditorProps> = ({
   isContextMenuOpen,
   providerId,
   supportsNativeRename,
+  supportsResumeCommand,
+  supportsSessionDeletion,
+  supportsRevealInFinder,
   inputRef,
   ignoreBlurRef,
   onEditValueChange,
@@ -217,7 +220,7 @@ export const SessionNameEditor: React.FC<SessionNameEditorProps> = ({
             <Copy className="w-3 h-3 mr-2" />
             {t("session.copySessionId", "Copy Session ID")}
           </DropdownMenuItem>
-          {providerId === "claude" && (
+          {supportsResumeCommand && (
             <DropdownMenuItem onClick={onCopyResumeCommand}>
               <Play className="w-3 h-3 mr-2" />
               {t("session.copyResumeCommand", "Copy Resume Command")}
@@ -227,18 +230,24 @@ export const SessionNameEditor: React.FC<SessionNameEditorProps> = ({
             <FileText className="w-3 h-3 mr-2" />
             {t("session.copyFilePath", "Copy File Path")}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={onRevealInFinder}>
-            <FolderOpen className="w-3 h-3 mr-2" />
-            {t("session.showJsonlFile", "Show JSONL File")}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={onDeleteSession}
-            className="text-destructive focus:text-destructive"
-          >
-            <Trash2 className="w-3 h-3 mr-2" />
-            {t("session.deleteSession", "Delete Session")}
-          </DropdownMenuItem>
+          {supportsRevealInFinder && (
+            <DropdownMenuItem onClick={onRevealInFinder}>
+              <FolderOpen className="w-3 h-3 mr-2" />
+              {t("session.showJsonlFile", "Show JSONL File")}
+            </DropdownMenuItem>
+          )}
+          {supportsSessionDeletion && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={onDeleteSession}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="w-3 h-3 mr-2" />
+                {t("session.deleteSession", "Delete Session")}
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </>

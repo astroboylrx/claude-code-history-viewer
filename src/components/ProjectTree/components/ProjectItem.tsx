@@ -154,6 +154,8 @@ export const ProjectItem: React.FC<ProjectItemProps> = React.memo(({
             providerId === "gemini" && "bg-purple-500/15 text-purple-600 dark:text-purple-400",
             providerId === "kimi" && "bg-orange-500/15 text-orange-600 dark:text-orange-400",
             providerId === "opencode" && "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+            providerId === "forgecode" && "bg-purple-500/15 text-purple-600 dark:text-purple-400",
+            providerId === "antigravity" && "bg-pink-500/15 text-pink-600 dark:text-pink-400",
             providerId === "aider" && "bg-rose-500/15 text-rose-600 dark:text-rose-400",
             providerId === "unknown" && "bg-gray-500/15 text-gray-600"
           )}

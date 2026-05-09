@@ -8,6 +8,8 @@ pub struct SessionTokenStats {
     pub total_output_tokens: u64,
     pub total_cache_creation_tokens: u64,
     pub total_cache_read_tokens: u64,
+    #[serde(default)]
+    pub total_reasoning_tokens: u64,
     pub total_tokens: u64,
     pub message_count: usize,
     pub first_message_time: String,
@@ -67,6 +69,8 @@ pub struct TokenDistribution {
     pub output: u64,
     pub cache_creation: u64,
     pub cache_read: u64,
+    #[serde(default)]
+    pub reasoning: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

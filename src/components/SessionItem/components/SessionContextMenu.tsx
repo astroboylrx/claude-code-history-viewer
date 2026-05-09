@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Pencil,
   RotateCcw,
@@ -11,12 +12,16 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import { computeMenuPosition, type Boundary } from "@/utils/contextMenu";
 
 interface SessionContextMenuProps {
-  position: { x: number; y: number };
+  position: { x: number; y: number; boundary?: Boundary | null };
   hasCustomName: boolean;
   supportsNativeRename: boolean;
   providerId: string;
+  supportsResumeCommand: boolean;
+  supportsSessionDeletion: boolean;
+  supportsRevealInFinder: boolean;
   onClose: () => void;
   onRenameClick: (e: React.MouseEvent) => void;
   onResetCustomName: () => void;
@@ -33,6 +38,9 @@ export const SessionContextMenu: React.FC<SessionContextMenuProps> = ({
   hasCustomName,
   supportsNativeRename,
   providerId,
+  supportsResumeCommand,
+  supportsSessionDeletion,
+  supportsRevealInFinder,
   onClose,
   onRenameClick,
   onResetCustomName,
@@ -45,7 +53,7 @@ export const SessionContextMenu: React.FC<SessionContextMenuProps> = ({
 }) => {
   const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
-  const [adjustedPosition, setAdjustedPosition] = useState(position);
+  const [adjustedPosition, setAdjustedPosition] = useState({ x: position.x, y: position.y });
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -65,19 +73,35 @@ export const SessionContextMenu: React.FC<SessionContextMenuProps> = ({
     };
   }, [onClose]);
 
+  // Close on scroll/resize (armed RAF — first event is ignored)
+  useEffect(() => {
+    let armed = false;
+    let rafId: number;
+    const handler = () => {
+      if (!armed) {
+        armed = true;
+        return;
+      }
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => onClose());
+    };
+    window.addEventListener("scroll", handler, true);
+    window.addEventListener("resize", handler);
+    return () => {
+      window.removeEventListener("scroll", handler, true);
+      window.removeEventListener("resize", handler);
+      cancelAnimationFrame(rafId);
+    };
+  }, [onClose]);
+
   useLayoutEffect(() => {
     if (menuRef.current) {
       const rect = menuRef.current.getBoundingClientRect();
-      let x = position.x;
-      let y = position.y;
-      if (x + rect.width > window.innerWidth) {
-        x = window.innerWidth - rect.width - 8;
-      }
-      if (y + rect.height > window.innerHeight) {
-        y = window.innerHeight - rect.height - 8;
-      }
-      x = Math.max(8, x);
-      y = Math.max(8, y);
+      const { x, y } = computeMenuPosition(
+        { x: position.x, y: position.y },
+        { width: rect.width, height: rect.height },
+        position.boundary,
+      );
       setAdjustedPosition({ x, y });
     }
   }, [position]);
@@ -96,7 +120,7 @@ export const SessionContextMenu: React.FC<SessionContextMenuProps> = ({
     };
   };
 
-  return (
+  return createPortal(
     <div
       ref={menuRef}
       role="menu"
@@ -143,7 +167,7 @@ export const SessionContextMenu: React.FC<SessionContextMenuProps> = ({
           <span>{t("session.copySessionId", "Copy Session ID")}</span>
         </button>
 
-        {providerId === "claude" && (
+        {supportsResumeCommand && (
           <button type="button" role="menuitem" onClick={handleAction(onCopyResumeCommand)} className={menuItemClass}>
             <Play className="w-3.5 h-3.5" />
             <span>{t("session.copyResumeCommand", "Copy Resume Command")}</span>
@@ -155,23 +179,29 @@ export const SessionContextMenu: React.FC<SessionContextMenuProps> = ({
           <span>{t("session.copyFilePath", "Copy File Path")}</span>
         </button>
 
-        <button type="button" role="menuitem" onClick={handleAction(onRevealInFinder)} className={menuItemClass}>
-          <FolderOpen className="w-3.5 h-3.5" />
-          <span>{t("session.showJsonlFile", "Show JSONL File")}</span>
-        </button>
+        {supportsRevealInFinder && (
+          <button type="button" role="menuitem" onClick={handleAction(onRevealInFinder)} className={menuItemClass}>
+            <FolderOpen className="w-3.5 h-3.5" />
+            <span>{t("session.showJsonlFile", "Show JSONL File")}</span>
+          </button>
+        )}
 
-        <div className="my-1 border-t border-border/50" />
-
-        <button
-          type="button"
-          role="menuitem"
-          onClick={handleAction(onDeleteSession)}
-          className={cn(menuItemClass, "text-destructive hover:text-destructive")}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          <span>{t("session.deleteSession", "Delete Session")}</span>
-        </button>
+        {supportsSessionDeletion && (
+          <>
+            <div className="my-1 border-t border-border/50" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleAction(onDeleteSession)}
+              className={cn(menuItemClass, "text-destructive hover:text-destructive")}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{t("session.deleteSession", "Delete Session")}</span>
+            </button>
+          </>
+        )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

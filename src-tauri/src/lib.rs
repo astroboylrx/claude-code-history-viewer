@@ -1,3 +1,5 @@
+pub mod cli;
+pub mod cli_args;
 pub mod commands;
 pub mod models;
 pub mod providers;
@@ -10,6 +12,9 @@ pub mod server;
 #[cfg(test)]
 pub mod test_utils;
 
+use crate::commands::antigravity::{
+    get_antigravity_project_summary, get_antigravity_session, load_antigravity_state,
+};
 use crate::commands::{
     archive::{
         create_archive, delete_archive, export_session, get_archive_base_path,
@@ -96,9 +101,28 @@ fn run_tauri() {
     }
 
     use std::sync::{Arc, Mutex};
+    use tauri::{Emitter, Manager};
+
+    let startup_session_hint = cli::StartupSessionHint(cli::parse_session_hint(
+        &std::env::args().collect::<Vec<_>>(),
+    ));
 
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                }
+                if let Some(hint) = cli::parse_session_hint(&argv) {
+                    let _ = app.emit("cli-session-hint", hint);
+                }
+            }));
+            if result.is_err() {
+                log::error!("single_instance callback panicked; argv dropped");
+            }
+        }))
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
@@ -110,11 +134,13 @@ fn run_tauri() {
 
     builder
         .manage(MetadataState::default())
+        .manage(startup_session_hint)
         .manage(Arc::new(Mutex::new(None))
             as Arc<
                 Mutex<Option<notify_debouncer_mini::Debouncer<notify::RecommendedWatcher>>>,
             >)
         .invoke_handler(tauri::generate_handler![
+            crate::cli::get_startup_session_hint,
             get_claude_folder_path,
             validate_claude_folder,
             validate_custom_claude_dir,
@@ -200,11 +226,34 @@ fn run_tauri() {
             export_session,
             // WSL commands
             detect_wsl_distros,
-            is_wsl_available
+            is_wsl_available,
+            // Antigravity token-monitor commands
+            load_antigravity_state,
+            get_antigravity_session,
+            get_antigravity_project_summary
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_, _| {});
+        .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                for url in urls {
+                    if let Some(hint) = cli::parse_session_hint_from_url(url) {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.unminimize();
+                            let _ = window.set_focus();
+                        }
+                        let _ = app.emit("cli-session-hint", hint);
+                        break;
+                    }
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = app;
+                let _ = event;
+            }
+        });
 }
 
 /// Run the Axum-based `WebUI` server (headless mode).
@@ -212,11 +261,12 @@ fn run_tauri() {
 fn run_server(args: &[String]) {
     use std::sync::Arc;
 
-    let port = parse_cli_flag(args, "--port")
+    let port = crate::cli_args::extract_flag_value(args, "--port")
         .and_then(|v| v.parse::<u16>().ok())
         .unwrap_or(3727);
-    let host = parse_cli_flag(args, "--host").unwrap_or_else(|| "0.0.0.0".to_string());
-    let dist_dir = parse_cli_flag(args, "--dist");
+    let host = crate::cli_args::extract_flag_value(args, "--host")
+        .unwrap_or_else(|| "0.0.0.0".to_string());
+    let dist_dir = crate::cli_args::extract_flag_value(args, "--dist");
 
     // Auth token: --token <value> | --no-auth | auto-generated uuid v4
     let auth_token_info = resolve_auth_token(args);
@@ -307,11 +357,13 @@ fn resolve_auth_token(args: &[String]) -> Option<(String, AuthTokenSource)> {
     if args.iter().any(|a| a == "--no-auth") {
         return None;
     }
-    if let Some(token) = parse_cli_flag(args, "--token") {
+    if let Some(token) = crate::cli_args::extract_flag_value(args, "--token") {
         let trimmed = token.trim();
         if !trimmed.is_empty() {
             return Some((trimmed.to_string(), AuthTokenSource::Cli));
         }
+        eprintln!("⚠ --token value is empty; falling back to auto-generated token");
+    } else if crate::cli_args::has_explicit_empty_flag(args, "--token") {
         eprintln!("⚠ --token value is empty; falling back to auto-generated token");
     }
     if let Ok(token) = std::env::var("CCHV_TOKEN") {
@@ -470,23 +522,4 @@ fn collect_watch_paths() -> Vec<std::path::PathBuf> {
         .into_iter()
         .filter(|p| seen.insert(p.clone()))
         .collect::<Vec<_>>()
-}
-
-/// Parse a CLI flag value: `--flag value` or `--flag=value`.
-#[cfg(feature = "webui-server")]
-fn parse_cli_flag(args: &[String], flag: &str) -> Option<String> {
-    for (i, arg) in args.iter().enumerate() {
-        // --flag=value
-        if let Some(val) = arg.strip_prefix(&format!("{flag}=")) {
-            return Some(val.to_string());
-        }
-        // --flag value
-        if arg == flag {
-            match args.get(i + 1) {
-                Some(v) if !v.starts_with("--") => return Some(v.clone()),
-                _ => return None,
-            }
-        }
-    }
-    None
 }
