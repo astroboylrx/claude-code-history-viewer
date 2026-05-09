@@ -47,13 +47,11 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
     return () => cancelAnimationFrame(id);
   }, [projectSummary]);
 
-  // Generate full range daily data using utility function
   const dailyData = useMemo(
     () => generateTrendData(projectSummary?.daily_stats),
     [projectSummary?.daily_stats]
   );
 
-  // Calculate billing cost from model distribution
   const billingCostSummary = useMemo(() => {
     if (!projectSummary?.model_distribution?.length) {
       return { totalEstimatedCost: 0 };
@@ -64,7 +62,6 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
     );
   }, [projectSummary?.model_distribution, projectSummary?.total_tokens]);
 
-  // Calculate conversation cost if conversation summary is available
   const conversationCost = useMemo(() => {
     if (!conversationSummary?.model_distribution?.length) return null;
     const summary = calculateGlobalCostSummary(
@@ -74,7 +71,6 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
     return summary.totalEstimatedCost;
   }, [conversationSummary?.model_distribution, conversationSummary?.total_tokens]);
 
-  // 데이터가 없으면 항상 로딩 상태 표시 (뷰 전환 직후 isLoading이 false일 수 있음)
   if (!projectSummary) {
     return (
       <div className="flex items-center justify-center h-full min-h-[400px]">
@@ -88,13 +84,12 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
     );
   }
 
-  // Calculate growth metrics using utility function
   const { tokenGrowth, messageGrowth } = extractProjectGrowth(projectSummary);
   const billingTokens = projectSummary.total_tokens;
   const billingCost = billingCostSummary.totalEstimatedCost;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-stagger">
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
@@ -152,7 +147,7 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
           {projectSummary.daily_stats.length > 0 ? (
             <ActivityHeatmapComponent data={projectSummary.daily_stats} />
           ) : (
-            <div className="text-center py-8 text-muted-foreground text-sm">
+            <div className="text-center py-8 text-muted-foreground text-[12px]">
               {t("analytics.No activity data available")}
             </div>
           )}
@@ -196,14 +191,14 @@ export const ProjectStatsView: React.FC<ProjectStatsViewProps> = ({
                 return (
                   <div key={model.model_name}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="block max-w-[60%] text-sm font-medium text-foreground truncate">
+                      <span className="block max-w-[60%] text-[12px] font-medium text-foreground truncate">
                         {model.model_name}
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-muted-foreground">
+                        <span className="font-mono text-[12px] text-muted-foreground">
                           {formattedPrice}
                         </span>
-                        <span className="font-mono text-sm font-semibold text-foreground">
+                        <span className="font-mono text-[12px] font-semibold text-foreground">
                           {formattedTokens}
                         </span>
                       </div>

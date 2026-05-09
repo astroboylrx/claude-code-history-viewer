@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "./store/useAppStore";
 import { useAnalytics } from "./hooks/useAnalytics";
 import { useUpdater } from "./hooks/useUpdater";
@@ -18,12 +17,18 @@ import {
   type GroupingMode,
 } from "./types";
 import { getProviderLabel, normalizeProviderIds } from "./utils/providers";
+import {
+  fetchStartupSessionHint,
+  preloadSessionFromCli,
+  type SessionHint,
+} from "./lib/preloadSession";
 
 import "./App.css";
 
 function App() {
   const {
     projects,
+    sessions,
     selectedProject,
     selectedSession,
     messages,
@@ -65,52 +70,7 @@ function App() {
     isNavigatorOpen,
     toggleNavigator,
     activeProviders,
-  } = useAppStore(
-    useShallow((state) => ({
-      projects: state.projects,
-      selectedProject: state.selectedProject,
-      selectedSession: state.selectedSession,
-      messages: state.messages,
-      isLoading: state.isLoading,
-      isLoadingProjects: state.isLoadingProjects,
-      isLoadingSessions: state.isLoadingSessions,
-      isLoadingMessages: state.isLoadingMessages,
-      isLoadingTokenStats: state.isLoadingTokenStats,
-      error: state.error,
-      sessionTokenStats: state.sessionTokenStats,
-      sessionConversationTokenStats: state.sessionConversationTokenStats,
-      projectTokenStats: state.projectTokenStats,
-      projectConversationTokenStats: state.projectConversationTokenStats,
-      projectTokenStatsSummary: state.projectTokenStatsSummary,
-      projectConversationTokenStatsSummary: state.projectConversationTokenStatsSummary,
-      projectTokenStatsPagination: state.projectTokenStatsPagination,
-      sessionSearch: state.sessionSearch,
-      selectProject: state.selectProject,
-      selectSession: state.selectSession,
-      clearProjectSelection: state.clearProjectSelection,
-      setSessionSearchQuery: state.setSessionSearchQuery,
-      setSearchFilterType: state.setSearchFilterType,
-      goToNextMatch: state.goToNextMatch,
-      goToPrevMatch: state.goToPrevMatch,
-      clearSessionSearch: state.clearSessionSearch,
-      loadGlobalStats: state.loadGlobalStats,
-      setAnalyticsCurrentView: state.setAnalyticsCurrentView,
-      loadMoreProjectTokenStats: state.loadMoreProjectTokenStats,
-      loadMoreRecentEdits: state.loadMoreRecentEdits,
-      updateUserSettings: state.updateUserSettings,
-      getGroupedProjects: state.getGroupedProjects,
-      getDirectoryGroupedProjects: state.getDirectoryGroupedProjects,
-      getEffectiveGroupingMode: state.getEffectiveGroupingMode,
-      hideProject: state.hideProject,
-      unhideProject: state.unhideProject,
-      isProjectHidden: state.isProjectHidden,
-      dateFilter: state.dateFilter,
-      setDateFilter: state.setDateFilter,
-      isNavigatorOpen: state.isNavigatorOpen,
-      toggleNavigator: state.toggleNavigator,
-      activeProviders: state.activeProviders,
-    }))
-  );
+  } = useAppStore();
 
   const {
     state: analyticsState,
@@ -163,9 +123,78 @@ function App() {
     );
   }, [activeProviders, t]);
 
+  const cliPreloadAttempted = useRef(false);
+  const openSessionPicker = useAppStore((s) => s.openSessionPicker);
+
+  const projectsRef = useRef(projects);
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
+
+  const pendingHintRef = useRef<SessionHint | null>(null);
+
+  const runPreloadWithHint = useCallback(
+    (hint: SessionHint) => {
+      void preloadSessionFromCli({
+        getStartupSessionHint: () => Promise.resolve(hint),
+        projects: projectsRef.current,
+        selectProject,
+        selectSession,
+        openSessionPicker,
+        t: (key, fallback) => t(key, fallback ?? key),
+      });
+    },
+    [selectProject, selectSession, openSessionPicker, t],
+  );
+
+  useEffect(() => {
+    if (cliPreloadAttempted.current) return;
+    if (isLoadingProjects || projects.length === 0) return;
+    cliPreloadAttempted.current = true;
+    const queued = pendingHintRef.current;
+    if (queued) {
+      pendingHintRef.current = null;
+      runPreloadWithHint(queued);
+      return;
+    }
+    void preloadSessionFromCli({
+      getStartupSessionHint: fetchStartupSessionHint,
+      projects,
+      selectProject,
+      selectSession,
+      openSessionPicker,
+      t: (key, fallback) => t(key, fallback ?? key),
+    });
+  }, [isLoadingProjects, projects, selectProject, selectSession, openSessionPicker, t, runPreloadWithHint]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    const subscribe = async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        if (cancelled) return;
+        unlisten = await listen<SessionHint>("cli-session-hint", (event) => {
+          const hint = event.payload;
+          if (!cliPreloadAttempted.current || projectsRef.current.length === 0) {
+            pendingHintRef.current = hint;
+            return;
+          }
+          runPreloadWithHint(hint);
+        });
+      } catch (error) {
+        console.warn("cli-session-hint listener unavailable:", error);
+      }
+    };
+    void subscribe();
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [runPreloadWithHint]);
+
   // Local state
-  const isViewingGlobalStats = useAppStore((s) => s.isViewingGlobalStats);
-  const setIsViewingGlobalStats = useAppStore((s) => s.setIsViewingGlobalStats);
+  const [isViewingGlobalStats, setIsViewingGlobalStats] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -246,7 +275,7 @@ function App() {
 
   const handleTokenStatClick = useCallback(
     (stats: SessionTokenStats) => {
-      const session = useAppStore.getState().sessions.find(
+      const session = sessions.find(
         (s) =>
           s.actual_session_id === stats.session_id ||
           s.session_id === stats.session_id
@@ -258,43 +287,45 @@ function App() {
         console.warn("Session not found in loaded list:", stats.session_id);
       }
     },
-    [handleSessionSelect]
+    [sessions, handleSessionSelect]
   );
 
-   const handleProjectSelect = useCallback(
-     async (project: ClaudeProject) => {
-       const currentProject = useAppStore.getState().selectedProject;
-       if (currentProject?.path === project.path) {
-         clearProjectSelection();
-         return;
-       }
+  const handleProjectSelect = useCallback(
+    async (project: ClaudeProject) => {
+      const currentProject = useAppStore.getState().selectedProject;
 
-       const activeView = useAppStore.getState().analytics.currentView;
-       setIsViewingGlobalStats(false);
+      if (currentProject?.path === project.path) {
+        clearProjectSelection();
+        return;
+      }
 
-       analyticsActions.clearAll();
-       setDateFilter({ start: null, end: null });
+      const activeView = useAppStore.getState().analytics.currentView;
+      setIsViewingGlobalStats(false);
 
-       await selectProject(project);
+      analyticsActions.clearAll();
+      setDateFilter({ start: null, end: null });
 
-       try {
-         if (activeView === "tokenStats") {
-           void analyticsActions.switchToTokenStats();
-         } else if (activeView === "board") {
-           void analyticsActions.switchToBoard();
-         } else if (activeView === "recentEdits") {
-           void analyticsActions.switchToRecentEdits();
-         } else if (activeView === "settings") {
-           analyticsActions.switchToSettings();
-         } else {
-           void analyticsActions.switchToAnalytics();
-         }
-       } catch (error) {
-         console.error(`Failed to auto-load ${activeView} view:`, error);
-       }
-     },
-      [clearProjectSelection, selectProject, analyticsActions, setDateFilter]
-    );
+      await selectProject(project);
+
+      try {
+        if (activeView === "tokenStats") {
+          await analyticsActions.switchToTokenStats();
+        } else if (activeView === "board") {
+          await analyticsActions.switchToBoard();
+        } else if (activeView === "recentEdits") {
+          await analyticsActions.switchToRecentEdits();
+        } else if (activeView === "settings") {
+          analyticsActions.switchToSettings();
+        } else {
+          // Default: analytics view (includes initial launch and "messages" state)
+          await analyticsActions.switchToAnalytics();
+        }
+      } catch (error) {
+        console.error(`Failed to auto-load ${activeView} view:`, error);
+      }
+    },
+    [clearProjectSelection, selectProject, analyticsActions, setDateFilter]
+  );
 
   // Handle pending project navigation from other components (e.g. GlobalStatsView)
   useEffect(() => {
@@ -325,6 +356,7 @@ function App() {
   return (
     <AppLayout
       projects={projects}
+      sessions={sessions}
       selectedProject={selectedProject}
       selectedSession={selectedSession}
       messages={messages}

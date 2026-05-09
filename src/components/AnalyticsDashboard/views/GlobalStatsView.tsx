@@ -107,8 +107,8 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
   }, [globalSummary.date_range.last_message, t]);
 
   return (
-    <div className="flex-1 p-3 md:p-6 overflow-auto bg-background space-y-4 md:space-y-6">
-      <p className="text-xs text-muted-foreground">
+    <div className="flex-1 p-3 md:p-6 overflow-auto bg-background space-y-4 md:space-y-6 animate-stagger">
+      <p className="text-[11px] text-muted-foreground">
         {t(
           "analytics.providerScopeProjectTree",
           "Provider scope follows Project Tree provider tabs."
@@ -158,13 +158,13 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
       />
 
       <div className="flex flex-wrap items-center gap-2">
-        <span className="px-2 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs">
+        <span className="px-2 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[11px]">
           {t("analytics.estimatedLabel", "Estimated")}
         </span>
-        <span className="px-2 py-1 rounded-md bg-muted/40 text-muted-foreground text-xs">
+        <span className="px-2 py-1 rounded-md bg-muted/40 text-muted-foreground text-[11px]">
           {t("analytics.pricingCoverage", "Pricing coverage")}: {costSummary.coveragePercent.toFixed(1)}%
         </span>
-        <span className="px-2 py-1 rounded-md bg-muted/40 text-muted-foreground text-xs">
+        <span className="px-2 py-1 rounded-md bg-muted/40 text-muted-foreground text-[11px]">
           {t("analytics.lastUpdated", "Last updated")}: {lastUpdated}
         </span>
       </div>
@@ -202,7 +202,7 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
                         <TooltipTrigger asChild>
                           <button
                             type="button"
-                            className="block max-w-[60%] text-sm font-medium text-foreground truncate text-left cursor-default"
+                            className="block max-w-[60%] text-[12px] font-medium text-foreground truncate text-left cursor-default"
                           >
                             {model.model_name}
                           </button>
@@ -212,10 +212,10 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
                         </TooltipContent>
                       </Tooltip>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-muted-foreground">
+                        <span className="font-mono text-[12px] text-muted-foreground">
                           {formattedPrice}
                         </span>
-                        <span className="font-mono text-sm font-semibold text-foreground">
+                        <span className="font-mono text-[12px] font-semibold text-foreground">
                           {formattedTokens}
                         </span>
                       </div>
@@ -237,6 +237,13 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
           </SectionCard>
         )}
 
+        <SectionCard
+          title={t("analytics.mostUsedToolsTitle")}
+          icon={Wrench}
+          colorVariant="amber"
+        >
+          <ToolUsageChart tools={globalSummary.most_used_tools} />
+        </SectionCard>
       </div>
 
       {/* Heatmap & Top Projects */}
@@ -245,7 +252,7 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
           {globalSummary.daily_stats.length > 0 ? (
             <ActivityHeatmapComponent data={globalSummary.daily_stats} />
           ) : (
-            <div className="text-center py-8 text-muted-foreground text-sm">
+            <div className="text-center py-8 text-muted-foreground text-[12px]">
               {t("analytics.No activity data available")}
             </div>
           )}
@@ -268,7 +275,7 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div
                         className={cn(
-                          "w-6 h-6 rounded-md flex items-center justify-center text-sm font-bold",
+                          "w-6 h-6 rounded-md flex items-center justify-center text-[12px] font-bold",
                           hasMedal(index) ? "text-base" : "bg-muted text-muted-foreground"
                         )}
                       >
@@ -277,17 +284,18 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
                       <div className="flex-1 min-w-0">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span
-                              className="block w-full text-sm font-medium text-foreground truncate"
+                            <button
+                              type="button"
+                              className="block w-full text-[12px] font-medium text-foreground truncate text-left cursor-default"
                             >
                               {project.project_name}
-                            </span>
+                            </button>
                           </TooltipTrigger>
                           <TooltipContent>
                             {project.project_name}
                           </TooltipContent>
                         </Tooltip>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                        <p className="text-[12px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
                           <span
                             className={cn(
                               "inline-flex px-1.5 py-0.5 text-2xs font-medium rounded-full leading-none",
@@ -317,10 +325,10 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-mono text-sm font-bold text-foreground">
+                      <p className="font-mono text-[12px] font-bold text-foreground">
                         {formatNumber(project.tokens)}
                       </p>
-                      <p className="text-sm text-muted-foreground">{t("analytics.tokens")}</p>
+                      <p className="text-[12px] text-muted-foreground">{t("analytics.tokens")}</p>
                     </div>
                   </div>
                 );
@@ -328,17 +336,6 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
             </div>
           </SectionCard>
         )}
-      </div>
-
-      {/* Most Used Tools */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-        <SectionCard
-          title={t("analytics.mostUsedToolsTitle")}
-          icon={Wrench}
-          colorVariant="amber"
-        >
-          <ToolUsageChart tools={globalSummary.most_used_tools} />
-        </SectionCard>
       </div>
     </div>
   );

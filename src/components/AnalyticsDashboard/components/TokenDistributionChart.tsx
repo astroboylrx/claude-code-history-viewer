@@ -4,9 +4,11 @@
  * Clean donut chart with legend list.
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { TrendingUp, Zap, Database, Eye } from "lucide-react";
+import { Tooltip, TooltipTrigger } from "../../ui/tooltip";
+import { ChartTooltip } from "../../ui/chart-tooltip";
 import type { TokenDistribution } from "../types";
 import { formatNumber } from "../utils";
 import { cn } from "@/lib/utils";
@@ -34,9 +36,6 @@ export const TokenDistributionChart: React.FC<TokenDistributionChartProps> = ({
 
   const safeTotal = Math.max(total, 1);
 
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-
-  // Calculate SVG arc paths for donut chart
   const { arcs, sortedItems } = useMemo(() => {
     const sorted = [...items].filter(i => i.value > 0).sort((a, b) => b.value - a.value);
     const radius = 80;
@@ -47,13 +46,8 @@ export const TokenDistributionChart: React.FC<TokenDistributionChartProps> = ({
     const arcPaths = sorted.map((item) => {
       const percentage = item.value / safeTotal;
       const angle = percentage * 360;
-
-      if (percentage >= 0.999) {
-        startAngle += angle;
-        return { ...item, percentage, isFullCircle: true as const, path: "" };
-      }
-
       const endAngle = startAngle + angle;
+
       const startRad = (startAngle * Math.PI) / 180;
       const endRad = (endAngle * Math.PI) / 180;
       const x1 = cx + radius * Math.cos(startRad);
@@ -65,7 +59,7 @@ export const TokenDistributionChart: React.FC<TokenDistributionChartProps> = ({
       const path = `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`;
       startAngle = endAngle;
 
-      return { ...item, path, percentage, isFullCircle: false as const };
+      return { ...item, path, percentage };
     });
 
     return { arcs: arcPaths, sortedItems: sorted };
@@ -85,58 +79,37 @@ export const TokenDistributionChart: React.FC<TokenDistributionChartProps> = ({
             opacity="0.15"
           />
 
-          {arcs.map((arc, idx) => (
-            arc.isFullCircle ? (
-              <circle
-                key={arc.label}
-                cx="100"
-                cy="100"
-                r="80"
-                fill="none"
-                stroke={arc.color}
-                strokeWidth="20"
-                className="cursor-pointer transition-opacity duration-200"
-                style={{ opacity: hoveredIdx === null || hoveredIdx === idx ? 1 : 0.3 }}
-                onMouseEnter={() => setHoveredIdx(idx)}
-                onMouseLeave={() => setHoveredIdx(null)}
+          {arcs.map((arc) => (
+            <Tooltip key={arc.label}>
+              <TooltipTrigger asChild>
+                <path
+                  d={arc.path}
+                  fill="none"
+                  stroke={arc.color}
+                  strokeWidth="20"
+                  strokeLinecap="butt"
+                  className="cursor-pointer transition-opacity duration-200 hover:opacity-70"
+                />
+              </TooltipTrigger>
+              <ChartTooltip
+                title={arc.label}
+                side="right"
+                rows={[
+                  { label: t("analytics.tooltip.tokens"), value: `${formatNumber(arc.value)}`, color: arc.color },
+                  { label: t("analytics.tooltip.share"), value: `${(arc.percentage * 100).toFixed(1)}%` },
+                ]}
               />
-            ) : (
-              <path
-                key={arc.label}
-                d={arc.path}
-                fill="none"
-                stroke={arc.color}
-                strokeWidth="20"
-                strokeLinecap="butt"
-                className="cursor-pointer transition-opacity duration-200"
-                style={{ opacity: hoveredIdx === null || hoveredIdx === idx ? 1 : 0.3 }}
-                onMouseEnter={() => setHoveredIdx(idx)}
-                onMouseLeave={() => setHoveredIdx(null)}
-              />
-            )
+            </Tooltip>
           ))}
         </svg>
 
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-          {hoveredIdx !== null && arcs[hoveredIdx] ? (
-            <>
-              <div className="font-mono text-lg font-bold tabular-nums" style={{ color: arcs[hoveredIdx].color }}>
-                {formatNumber(arcs[hoveredIdx].value)}
-              </div>
-              <div className="text-3xs font-medium text-muted-foreground">
-                {arcs[hoveredIdx].label} ({(arcs[hoveredIdx].percentage * 100).toFixed(1)}%)
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="font-mono text-2xl font-bold text-foreground tabular-nums">
-                {formatNumber(total)}
-              </div>
-              <div className="text-3xs font-medium text-muted-foreground uppercase tracking-wider mt-1">
-                {t("analytics.totalTokenUsage")}
-              </div>
-            </>
-          )}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <div className="font-mono text-2xl font-bold text-foreground tabular-nums">
+            {formatNumber(total)}
+          </div>
+          <div className="text-3xs font-medium text-muted-foreground uppercase tracking-wider mt-1">
+            {t("analytics.totalTokenUsage")}
+          </div>
         </div>
       </div>
 
@@ -167,10 +140,10 @@ export const TokenDistributionChart: React.FC<TokenDistributionChartProps> = ({
               {/* Label & Bar */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline justify-between mb-1">
-                  <span className="text-xs font-medium text-foreground/80 truncate">
+                  <span className="text-3xs font-medium text-foreground/80 truncate">
                     {item.label}
                   </span>
-                  <span className="font-mono text-xs text-muted-foreground ml-2 tabular-nums">
+                  <span className="font-mono text-3xs text-muted-foreground ml-2 tabular-nums">
                     {percentage.toFixed(1)}%
                   </span>
                 </div>

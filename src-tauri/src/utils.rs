@@ -191,7 +191,14 @@ pub fn decode_project_path(session_storage_path: &str) -> String {
         }
     }
 
-    // 2. Fallback: decode from encoded directory name
+    // 2. Try reading cwd from the first JSONL file in the project directory
+    //    This handles paths with special characters (spaces, &, _, etc.) that
+    //    Claude Code encodes ambiguously as dashes.
+    if let Some(cwd) = extract_cwd_from_project_dir(session_storage_path) {
+        return cwd;
+    }
+
+    // 3. Fallback: decode from encoded directory name
     const MARKER: &str = ".claude/projects/";
     if let Some(marker_pos) = session_storage_path.find(MARKER) {
         let encoded = &session_storage_path[marker_pos + MARKER.len()..];
@@ -213,6 +220,42 @@ pub fn decode_project_path(session_storage_path: &str) -> String {
         }
     }
     session_storage_path.to_string()
+}
+
+/// Read the `cwd` field from the first JSONL file in a project directory.
+/// Only reads the first few lines to find a message with a cwd field.
+fn extract_cwd_from_project_dir(project_dir: &str) -> Option<String> {
+    let dir = std::fs::read_dir(project_dir).ok()?;
+    for entry in dir.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+            continue;
+        }
+        if let Ok(file) = std::fs::File::open(&path) {
+            use std::io::{BufRead, BufReader};
+            let reader = BufReader::new(file);
+            for line in reader.lines().take(20) {
+                if let Ok(line) = line {
+                    if line.len() < 10 {
+                        continue;
+                    }
+                    // Fast check before full JSON parse
+                    if !line.contains("\"cwd\"") {
+                        continue;
+                    }
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&line) {
+                        if let Some(cwd) = val.get("cwd").and_then(|v| v.as_str()) {
+                            if !cwd.is_empty() && Path::new(cwd).is_absolute() {
+                                return Some(cwd.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Found a JSONL file but no cwd — try next file
+    }
+    None
 }
 
 /// Decode path by checking filesystem existence at each possible split point

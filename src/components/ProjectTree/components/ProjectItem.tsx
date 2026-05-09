@@ -7,6 +7,14 @@ import type { ProjectItemProps } from "../types";
 import { getWorktreeLabel } from "../../../utils/worktreeUtils";
 import { getProviderId, getProviderLabel } from "../../../utils/providers";
 
+function truncatePath(path: string): string {
+  if (path.length <= 40) return path;
+  if (!path.startsWith("~")) return path;
+  const segments = path.slice(2).split("/").filter(Boolean);
+  if (segments.length <= 3) return path;
+  return `~/…/${segments.slice(-3).join("/")}`;
+}
+
 export const ProjectItem: React.FC<ProjectItemProps> = React.memo(({ 
   project,
   isExpanded,
@@ -29,7 +37,7 @@ export const ProjectItem: React.FC<ProjectItemProps> = React.memo(({
     ? t("project.main", "main")
     : isWorktree
       ? getWorktreeLabel(project.actual_path)
-      : project.name;
+      : truncatePath(project.name);
 
   const providerId = getProviderId(project.provider);
   const baseProviderLabel = getProviderLabel(
