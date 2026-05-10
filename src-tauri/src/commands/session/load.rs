@@ -640,7 +640,7 @@ fn recover_from_subagents(
             last_modified,
             has_tool_use: true,
             has_errors: false,
-            summary: recovered_summary.clone(),
+            summary: recovered_summary.clone().map(|s| format!("[Recovered] {s}")),
             is_renamed: false,
             provider: None,
             storage_type: None,
@@ -1083,6 +1083,128 @@ pub async fn load_project_sessions(
     // 6. Sort by last message time (conversation time) instead of filesystem modification time
     sessions.sort_by(|a, b| b.last_message_time.cmp(&a.last_message_time));
 
+    // 7. Orphaned subagent recovery: find {uuid}/subagents/ dirs with no parent {uuid}.jsonl
+    {
+        let known_ids: std::collections::HashSet<String> = sessions
+            .iter()
+            .map(|s| s.actual_session_id.clone())
+            .collect();
+
+        let project_path_buf = PathBuf::from(&project_path);
+        if let Ok(entries) = std::fs::read_dir(&project_path_buf) {
+            for entry in entries.flatten() {
+                if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    continue;
+                }
+                let dir_name = match entry.file_name().to_str() {
+                    Some(n) => n.to_string(),
+                    None => continue,
+                };
+                if known_ids.contains(&dir_name) {
+                    continue;
+                }
+
+                let subagents_dir = entry.path().join("subagents");
+                if !subagents_dir.is_dir() {
+                    continue;
+                }
+
+                let mut sub_files: Vec<PathBuf> = Vec::new();
+                if let Ok(rd) = std::fs::read_dir(&subagents_dir) {
+                    for se in rd.flatten() {
+                        let p = se.path();
+                        if p.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+                            sub_files.push(p);
+                        }
+                    }
+                }
+                if sub_files.is_empty() {
+                    continue;
+                }
+
+                let mut first_ts: Option<String> = None;
+                let mut last_ts: Option<String> = None;
+                let mut total_messages: usize = 0;
+                let mut recovered_summary: Option<String> = None;
+
+                for sub_path in &sub_files {
+                    let file = match fs::File::open(sub_path) {
+                        Ok(f) => f,
+                        Err(_) => continue,
+                    };
+                    let reader = BufReader::new(file);
+                    for line in reader.lines() {
+                        let Ok(line) = line else { continue };
+                        let Ok(val) = serde_json::from_str::<serde_json::Value>(&line) else {
+                            continue;
+                        };
+                        let ts = val["timestamp"].as_str().unwrap_or("").to_string();
+                        if !ts.is_empty() {
+                            if first_ts.as_ref().map_or(true, |f| ts < *f) {
+                                first_ts = Some(ts.clone());
+                            }
+                            if last_ts.as_ref().map_or(true, |l| ts > *l) {
+                                last_ts = Some(ts.clone());
+                            }
+                        }
+                        let msg_type = val["type"].as_str().unwrap_or("");
+                        if msg_type == "user" || msg_type == "assistant" {
+                            total_messages += 1;
+                        }
+                        if recovered_summary.is_none() && msg_type == "user" {
+                            if let Some(content) = val["message"]["content"].as_str() {
+                                let text = content.trim().to_string();
+                                if !text.is_empty()
+                                    && !text.starts_with('<')
+                                    && !text.starts_with("Bash ")
+                                    && text.len() > 3
+                                {
+                                    recovered_summary = Some(text);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if total_messages == 0 {
+                    continue;
+                }
+
+                let raw_project_name = project_path_buf
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("Unknown");
+                let project_name = extract_project_name(raw_project_name);
+
+                let summary = match recovered_summary {
+                    Some(ref s) => Some(format!("[Recovered] {s}")),
+                    None => Some("[Recovered session]".to_string()),
+                };
+
+                let fake_path = subagents_dir.to_string_lossy().to_string();
+                sessions.push(ClaudeSession {
+                    session_id: fake_path.clone(),
+                    actual_session_id: dir_name.clone(),
+                    file_path: fake_path,
+                    project_name,
+                    message_count: total_messages,
+                    first_message_time: first_ts.unwrap_or_else(|| Utc::now().to_rfc3339()),
+                    last_message_time: last_ts.clone().unwrap_or_else(|| Utc::now().to_rfc3339()),
+                    last_modified: last_ts.unwrap_or_else(|| Utc::now().to_rfc3339()),
+                    has_tool_use: true,
+                    has_errors: false,
+                    summary,
+                    is_renamed: false,
+                    provider: None,
+                    storage_type: None,
+                });
+            }
+        }
+        if !sessions.is_empty() {
+            sessions.sort_by(|a, b| b.last_message_time.cmp(&a.last_message_time));
+        }
+    }
+
     // 8. Summary propagation
     let mut summary_map: HashMap<String, String> = HashMap::new();
 
@@ -1395,11 +1517,51 @@ fn parse_line_simd(
     })
 }
 
+fn load_messages_from_subagents_dir(dir: &Path) -> Result<Vec<ClaudeMessage>, String> {
+    let mut files: Vec<PathBuf> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        for entry in rd.flatten() {
+            let p = entry.path();
+            if p.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+                files.push(p);
+            }
+        }
+    }
+    files.sort();
+
+    let mut all_messages: Vec<ClaudeMessage> = Vec::new();
+    for sub_path in &files {
+        let file = fs::File::open(sub_path)
+            .map_err(|e| format!("Failed to open subagent file {}: {e}", sub_path.display()))?;
+        let reader = BufReader::new(file);
+        for line in reader.lines() {
+            let Ok(line) = line else { continue };
+            let mut bytes = line.into_bytes();
+            if let Some(msg) = parse_line_simd(0, &mut bytes, false) {
+                if !is_system_message_type(&msg.message_type)
+                    && !(msg.message_type == "system"
+                        && is_hidden_system_subtype(msg.subtype.as_deref()))
+                {
+                    all_messages.push(msg);
+                }
+            }
+        }
+    }
+
+    all_messages.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    Ok(all_messages)
+}
+
 #[tauri::command]
 #[allow(unsafe_code)] // Required for mmap performance optimization
 pub async fn load_session_messages(session_path: String) -> Result<Vec<ClaudeMessage>, String> {
     #[cfg(debug_assertions)]
     let start_time = std::time::Instant::now();
+
+    let path = PathBuf::from(&session_path);
+    if path.is_dir() {
+        return load_messages_from_subagents_dir(&path);
+    }
 
     // Use memory-mapped file for faster I/O
     let file =
@@ -1481,7 +1643,11 @@ pub async fn get_session_subagents(session_path: String) -> Result<Vec<SubagentS
 
     let path = PathBuf::from(&session_path);
     if !path.is_absolute() {
-        return Err("session_path must be an absolute path".to_string());
+        return Ok(Vec::new());
+    }
+    // Orphaned subagent sessions have file_path pointing to a subagents/ dir
+    if path.is_dir() {
+        return Ok(Vec::new());
     }
     let subagent_files = find_subagent_files(&path);
 
@@ -1639,6 +1805,33 @@ pub async fn load_session_messages_paginated(
 ) -> Result<MessagePage, String> {
     #[cfg(debug_assertions)]
     let start_time = std::time::Instant::now();
+
+    let path = PathBuf::from(&session_path);
+    if path.is_dir() {
+        let mut messages = load_messages_from_subagents_dir(&path)?;
+        let total_count = messages.len();
+        if total_count == 0 {
+            return Ok(MessagePage {
+                messages: vec![],
+                total_count: 0,
+                has_more: false,
+                next_offset: 0,
+            });
+        }
+        let already_loaded = offset;
+        let remaining = total_count.saturating_sub(already_loaded);
+        let to_load = std::cmp::min(limit, remaining);
+        let start_idx = total_count.saturating_sub(already_loaded + to_load);
+        let end_idx = total_count.saturating_sub(already_loaded);
+        let drained: Vec<ClaudeMessage> = messages.drain(start_idx..end_idx).collect();
+        let has_more = already_loaded + to_load < total_count;
+        return Ok(MessagePage {
+            messages: drained,
+            total_count,
+            has_more,
+            next_offset: already_loaded + to_load,
+        });
+    }
 
     // Use memory-mapped file for faster I/O
     let file =
