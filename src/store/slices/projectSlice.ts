@@ -262,7 +262,6 @@ export const createProjectSlice: StateCreator<
   },
 
   selectProject: async (project: ClaudeProject) => {
-    
     set({
       selectedProject: project,
       selectedSession: null,

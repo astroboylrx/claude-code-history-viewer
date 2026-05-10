@@ -99,7 +99,10 @@ export function useAnalyticsNavigation() {
       promises.push(loadProjectTokenStats(project.path));
 
       if (selectedSession) {
-        promises.push(loadSessionTokenStats(selectedSession.file_path));
+        const currentSession = useAppStore.getState().selectedSession;
+        if (currentSession) {
+          promises.push(loadSessionTokenStats(currentSession.file_path));
+        }
       }
 
       await Promise.all(promises);
@@ -146,16 +149,18 @@ export function useAnalyticsNavigation() {
         }
 
     if (selectedSession) {
+        const currentSession = useAppStore.getState().selectedSession;
+        if (currentSession) {
         startTransition(() => {
           setAnalyticsLoadingSessionComparison(true);
         });
         try {
           const [comparison] = await Promise.all([
             loadSessionComparison(
-              selectedSession.actual_session_id,
+              currentSession.actual_session_id,
               project.path
             ),
-            loadSessionTokenStats(selectedSession.file_path),
+            loadSessionTokenStats(currentSession.file_path),
           ]);
           startTransition(() => {
             setAnalyticsSessionComparison(comparison);
@@ -173,6 +178,7 @@ export function useAnalyticsNavigation() {
           startTransition(() => {
             setAnalyticsLoadingSessionComparison(false);
           });
+        }
         }
       }
      } catch (error) {
