@@ -169,18 +169,8 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
         </span>
       </div>
 
-      {/* Model Distribution & Tool Usage */}
+      {/* Model Distribution & Provider Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {globalSummary.provider_distribution.length > 0 && (
-          <SectionCard
-            title={t("analytics.providerDistribution", "Provider Distribution")}
-            icon={Server}
-            colorVariant="green"
-          >
-            <ProviderDistributionChart providers={globalSummary.provider_distribution} />
-          </SectionCard>
-        )}
-
         {globalSummary.model_distribution.length > 0 && (
           <SectionCard title={t("analytics.modelDistribution")} icon={Cpu} colorVariant="blue">
             <div className="space-y-3">
@@ -237,13 +227,15 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
           </SectionCard>
         )}
 
-        <SectionCard
-          title={t("analytics.mostUsedToolsTitle")}
-          icon={Wrench}
-          colorVariant="amber"
-        >
-          <ToolUsageChart tools={globalSummary.most_used_tools} />
-        </SectionCard>
+        {globalSummary.provider_distribution.length > 0 && (
+          <SectionCard
+            title={t("analytics.providerDistribution", "Provider Distribution")}
+            icon={Server}
+            colorVariant="green"
+          >
+            <ProviderDistributionChart providers={globalSummary.provider_distribution} />
+          </SectionCard>
+        )}
       </div>
 
       {/* Heatmap & Top Projects */}
@@ -336,6 +328,17 @@ export const GlobalStatsView: React.FC<GlobalStatsViewProps> = ({
             </div>
           </SectionCard>
         )}
+      </div>
+
+      {/* Most Used Tools */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <SectionCard
+          title={t("analytics.mostUsedToolsTitle")}
+          icon={Wrench}
+          colorVariant="amber"
+        >
+          <ToolUsageChart tools={globalSummary.most_used_tools} />
+        </SectionCard>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ use crate::models::{ClaudeMessage, ClaudeProject, ClaudeSession, TokenUsage};
 use crate::utils::{build_provider_message, find_line_ranges, search_json_value_case_insensitive};
 use chrono::{DateTime, Utc};
 use memmap2::Mmap;
+use rusqlite::{Connection, OpenFlags};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -63,6 +64,35 @@ fn get_existing_session_dirs() -> Result<Vec<PathBuf>, String> {
         .into_iter()
         .filter(|path| path.exists() && path.is_dir())
         .collect())
+}
+
+fn load_thread_titles_from_db(base_path: &str) -> HashMap<String, String> {
+    let mut titles = HashMap::new();
+    let db_path = Path::new(base_path).join("state_5.sqlite");
+    if !db_path.exists() {
+        return titles;
+    }
+    let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX;
+    let conn = match Connection::open_with_flags(&db_path, flags) {
+        Ok(c) => c,
+        Err(_) => return titles,
+    };
+    let mut stmt = match conn.prepare("SELECT id, title FROM threads") {
+        Ok(s) => s,
+        Err(_) => return titles,
+    };
+    let rows = match stmt.query_map([], |row| {
+        let id: String = row.get(0)?;
+        let title: String = row.get(1)?;
+        Ok((id, title))
+    }) {
+        Ok(r) => r,
+        Err(_) => return titles,
+    };
+    for row in rows.flatten() {
+        titles.insert(row.0, row.1);
+    }
+    titles
 }
 
 fn is_rollout_jsonl(path: &Path) -> bool {
@@ -216,10 +246,13 @@ pub fn load_sessions(
         return Ok(vec![]);
     }
 
-    // Extract cwd from virtual path "codex://{cwd}"
     let target_cwd = project_path
         .strip_prefix("codex://")
         .unwrap_or(project_path);
+
+    let thread_titles = get_base_path()
+        .map(|bp| load_thread_titles_from_db(&bp))
+        .unwrap_or_default();
 
     let mut sessions = Vec::new();
 
@@ -239,6 +272,12 @@ pub fn load_sessions(
                     continue;
                 }
 
+                let summary = thread_titles
+                    .get(&info.session_id)
+                    .filter(|t| !t.is_empty() && *t != info.summary.as_deref().unwrap_or(""))
+                    .cloned()
+                    .or(info.summary);
+
                 sessions.push(ClaudeSession {
                     session_id: info.file_path.clone(),
                     actual_session_id: info.session_id,
@@ -253,7 +292,7 @@ pub fn load_sessions(
                     last_modified: info.last_modified,
                     has_tool_use: info.has_tool_use,
                     has_errors: false,
-                    summary: info.summary,
+                    summary,
                     is_renamed: false,
                     provider: Some("codex".to_string()),
                     storage_type: None,

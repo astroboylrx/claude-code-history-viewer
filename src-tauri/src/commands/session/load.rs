@@ -1,14 +1,14 @@
 //! Session loading functions
 
 use crate::models::{ClaudeMessage, ClaudeSession, MessagePage, RawLogEntry};
-use crate::utils::{extract_project_name, find_line_ranges, find_line_starts};
+use crate::utils::{extract_project_name, find_line_ranges, find_line_starts, find_subagent_files};
 use chrono::{DateTime, Utc};
 use memmap2::Mmap;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -511,7 +511,7 @@ fn extract_session_metadata_internal(
     }
 
     if message_count == 0 {
-        return None;
+        return recover_from_subagents(file_path, &file_path_str, actual_session_id, last_modified);
     }
 
     let raw_project_name = file_path
@@ -557,6 +557,102 @@ fn extract_session_metadata_internal(
         last_user_content,
         first_assistant_text,
         rename_name,
+    })
+}
+
+fn recover_from_subagents(
+    file_path: &Path,
+    file_path_str: &str,
+    actual_session_id: Option<String>,
+    last_modified: String,
+) -> Option<SessionExtractionResult> {
+    let subagent_files = find_subagent_files(file_path);
+    if subagent_files.is_empty() {
+        return None;
+    }
+
+    let mut first_ts: Option<String> = None;
+    let mut last_ts: Option<String> = None;
+    let mut total_messages: usize = 0;
+    let mut recovered_summary: Option<String> = None;
+
+    for sub_path in &subagent_files {
+        let file = fs::File::open(sub_path).ok()?;
+        let reader = BufReader::new(file);
+        for line in reader.lines() {
+            let Ok(line) = line else { continue };
+            let Ok(bytes) = serde_json::from_str::<serde_json::Value>(&line) else {
+                continue;
+            };
+
+            let ts = bytes["timestamp"].as_str().unwrap_or("").to_string();
+            if !ts.is_empty() {
+                if first_ts.as_ref().map_or(true, |f| ts < *f) {
+                    first_ts = Some(ts.clone());
+                }
+                if last_ts.as_ref().map_or(true, |l| ts > *l) {
+                    last_ts = Some(ts.clone());
+                }
+            }
+
+            let msg_type = bytes["type"].as_str().unwrap_or("");
+            if msg_type == "user" || msg_type == "assistant" {
+                total_messages += 1;
+            }
+
+            if recovered_summary.is_none() && msg_type == "user" {
+                if let Some(content) = bytes["message"]["content"].as_str() {
+                    let text = content.trim().to_string();
+                    if !text.is_empty()
+                        && !text.starts_with('<')
+                        && !text.starts_with("Bash ")
+                        && text.len() > 3
+                    {
+                        recovered_summary = Some(text);
+                    }
+                }
+            }
+        }
+    }
+
+    if total_messages == 0 {
+        return None;
+    }
+
+    let raw_project_name = file_path
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .unwrap_or("Unknown")
+        .to_string();
+    let project_name = extract_project_name(&raw_project_name);
+
+    Some(SessionExtractionResult {
+        session: ClaudeSession {
+            session_id: file_path_str.to_string(),
+            actual_session_id: actual_session_id
+                .unwrap_or_else(|| "unknown-session".to_string()),
+            file_path: file_path_str.to_string(),
+            project_name,
+            message_count: total_messages,
+            first_message_time: first_ts.unwrap_or_else(|| Utc::now().to_rfc3339()),
+            last_message_time: last_ts.unwrap_or_else(|| Utc::now().to_rfc3339()),
+            last_modified,
+            has_tool_use: true,
+            has_errors: false,
+            summary: recovered_summary.clone(),
+            is_renamed: false,
+            provider: None,
+            storage_type: None,
+        },
+        sidechain_count: 0,
+        final_byte_offset: 0,
+        has_tool_use: true,
+        has_errors: false,
+        first_user_content: recovered_summary,
+        last_user_content: None,
+        first_assistant_text: None,
+        rename_name: None,
     })
 }
 
@@ -1666,7 +1762,7 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::Write;
-    use std::path::PathBuf;
+use std::path::{Path, PathBuf};
     use tempfile::TempDir;
 
     fn create_test_jsonl_file(dir: &TempDir, filename: &str, content: &str) -> PathBuf {

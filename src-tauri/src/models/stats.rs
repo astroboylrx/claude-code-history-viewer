@@ -99,6 +99,8 @@ pub struct ModelStats {
     pub output_tokens: u64,
     pub cache_creation_tokens: u64,
     pub cache_read_tokens: u64,
+    #[serde(default)]
+    pub reasoning_tokens: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -149,6 +151,7 @@ mod tests {
             total_output_tokens: 500,
             total_cache_creation_tokens: 200,
             total_cache_read_tokens: 100,
+            total_reasoning_tokens: 0,
             total_tokens: 1800,
             message_count: 50,
             first_message_time: "2025-06-01T10:00:00Z".to_string(),
