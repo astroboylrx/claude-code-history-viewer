@@ -217,6 +217,7 @@ pub async fn scan_projects(claude_path: String) -> Result<Vec<ClaudeProject>, St
             .into_iter()
             .filter_map(std::result::Result::ok)
             .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("jsonl"))
+            .filter(|e| !e.path().to_str().map_or(false, |s| s.contains("/subagents/")))
         {
             session_count += 1;
 
@@ -227,7 +228,6 @@ pub async fn scan_projects(claude_path: String) -> Result<Vec<ClaudeProject>, St
                     }
                 }
 
-                // Estimate message count from file size - much faster
                 let estimated_messages = estimate_message_count_from_size(metadata.len());
                 message_count += estimated_messages;
             }
