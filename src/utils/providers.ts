@@ -54,7 +54,7 @@ const PROVIDER_SESSION_CAPABILITIES: Record<ProviderId, ProviderSessionCapabilit
   codex: {
     supportsConversationBreakdown: false,
     supportsNativeRename: false,
-    supportsResumeCommand: false,
+    supportsResumeCommand: true,
     supportsSessionDeletion: false,
     supportsArchiveCreation: false,
   },
@@ -175,11 +175,20 @@ export function supportsResumeCommand(provider?: ProviderId | string): boolean {
   return PROVIDER_SESSION_CAPABILITIES[provider as ProviderId].supportsResumeCommand;
 }
 
+function shellQuotePath(p: string): string {
+  return `'${p.replace(/'/g, "'\\''")}'`;
+}
+
 export function getResumeCommand(
   provider: ProviderId | string | undefined,
-  sessionId: string
+  sessionId: string,
+  cwd?: string
 ): string | null {
   if (!sessionId) {
+    return null;
+  }
+
+  if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) {
     return null;
   }
 
@@ -187,14 +196,23 @@ export function getResumeCommand(
     return null;
   }
 
+  let resume: string | null;
   switch (provider as ProviderId) {
     case "claude":
-      return `claude --resume ${sessionId}`;
+      resume = `claude --resume ${sessionId}`;
+      break;
+    case "codex":
+      resume = `codex resume ${sessionId}`;
+      break;
     case "forgecode":
-      return `forge conversation resume ${sessionId}`;
+      resume = `forge conversation resume ${sessionId}`;
+      break;
     default:
-      return null;
+      resume = null;
   }
+
+  if (resume == null) return null;
+  return cwd ? `cd ${shellQuotePath(cwd)} && ${resume}` : resume;
 }
 
 export function supportsSessionDeletion(provider?: ProviderId | string): boolean {

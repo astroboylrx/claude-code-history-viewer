@@ -126,9 +126,15 @@ export function SimpleUpdateModal({
     onClose();
   };
 
-  const handlePrimaryAction = () => {
+  const handlePrimaryAction = async () => {
     if (updater.state.requiresManualRestart) {
-      onClose();
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('force_quit_and_relaunch');
+      } catch (err) {
+        console.warn('[SimpleUpdateModal] force_quit_and_relaunch failed', err);
+        onClose();
+      }
       return;
     }
 
@@ -268,7 +274,7 @@ export function SimpleUpdateModal({
 
         <DialogFooter className="flex-col gap-2">
           <Button
-            onClick={handlePrimaryAction}
+            onClick={() => void handlePrimaryAction()}
             disabled={
               updater.state.isDownloading ||
               updater.state.isInstalling ||

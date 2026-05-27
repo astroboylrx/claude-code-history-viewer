@@ -206,7 +206,7 @@ function App() {
   } = useResizablePanel({
     defaultWidth: 256,
     minWidth: 200,
-    maxWidth: 480,
+    maxWidth: 800,
     storageKey: "sidebar-width",
   });
 

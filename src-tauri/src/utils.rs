@@ -52,16 +52,18 @@ pub fn find_line_starts(data: &[u8]) -> Vec<usize> {
 }
 
 pub fn extract_project_name(raw_project_name: &str) -> String {
-    if raw_project_name.starts_with('-') {
+    if let Some(stripped) = raw_project_name.strip_prefix('-') {
+        if let Some(decoded) = decode_with_filesystem_check(stripped) {
+            if let Some(leaf) = Path::new(&decoded).file_name() {
+                return leaf.to_string_lossy().to_string();
+            }
+        }
         let parts: Vec<&str> = raw_project_name.splitn(4, '-').collect();
         if parts.len() == 4 {
-            parts[3].to_string()
-        } else {
-            raw_project_name.to_string()
+            return parts[3].to_string();
         }
-    } else {
-        raw_project_name.to_string()
     }
+    raw_project_name.to_string()
 }
 
 /// Estimate message count from file size (more accurate calculation)

@@ -20,7 +20,7 @@ import { useModal } from "@/contexts/modal";
 
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
-import { isMacOS } from "@/utils/platform";
+import { isMacOS, isTauri } from "@/utils/platform";
 import { SettingDropdown } from "./SettingDropdown";
 
 interface HeaderProps {
@@ -30,6 +30,8 @@ interface HeaderProps {
 }
 
 const SHORTCUT_LABEL = isMacOS() ? "⌘+K" : "Ctrl+K";
+
+const HAS_MACOS_TRAFFIC_LIGHTS = isTauri() && isMacOS();
 
 export const Header = ({ analyticsActions, analyticsComputed, updater }: HeaderProps) => {
   const { t } = useTranslation();
@@ -86,11 +88,15 @@ export const Header = ({ analyticsActions, analyticsComputed, updater }: HeaderP
     <header
       id="app-header"
       role="banner"
-      className="h-12 flex items-center justify-between px-4 bg-sidebar border-b border-border/50"
+      className={cn(
+        "relative h-12 flex items-center justify-between px-4 bg-sidebar border-b border-border/50",
+        HAS_MACOS_TRAFFIC_LIGHTS && "pl-[72px]"
+      )}
     >
+      <div data-tauri-drag-region className="absolute inset-0" />
 
       {/* Left: Logo & Title */}
-      <div className="flex items-center gap-2.5 min-w-0">
+      <div className="relative z-10 flex items-center gap-2.5 min-w-0 pointer-events-none">
         <img
           src="/app-icon.png"
           alt="Claude Code History"
@@ -129,7 +135,7 @@ export const Header = ({ analyticsActions, analyticsComputed, updater }: HeaderP
 
       {/* Center: Quick Stats (when session selected) */}
       {selectedSession && computed.isMessagesView && (
-        <div className="hidden lg:flex items-center gap-2">
+        <div className="relative z-10 hidden lg:flex items-center gap-2 pointer-events-none">
           <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-2xs text-muted-foreground font-mono">
             {selectedSession.actual_session_id.slice(0, 8)}
@@ -138,7 +144,7 @@ export const Header = ({ analyticsActions, analyticsComputed, updater }: HeaderP
       )}
 
       {/* Right: Actions */}
-      <div className="flex items-center gap-1">
+      <div className="relative z-10 flex items-center gap-1">
         {/* Search button with shortcut hint */}
         <button
           onClick={() => openModal("globalSearch")}

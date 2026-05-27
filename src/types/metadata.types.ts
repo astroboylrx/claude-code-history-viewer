@@ -45,6 +45,9 @@ export type GroupingMode = "none" | "worktree" | "directory";
 /** Session sort order */
 export type SessionSortOrder = "newest" | "oldest";
 
+/** Session source filter — narrows the session list by the originating Claude Code client */
+export type SessionEntrypointFilter = "all" | "cli" | "vscode" | "desktop";
+
 /** Global user settings */
 export interface UserSettings {
   /** Glob patterns for projects to hide (e.g., "folders-dg-*") */

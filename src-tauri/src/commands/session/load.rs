@@ -42,6 +42,9 @@ struct CachedSessionMetadata {
     /// Rename name from /rename command
     #[serde(default)]
     rename_name: Option<String>,
+    /// Originating client entrypoint (cli, claude-vscode, claude-desktop)
+    #[serde(default)]
+    entrypoint: Option<String>,
 }
 
 /// Session metadata cache file structure
@@ -53,7 +56,7 @@ struct SessionMetadataCache {
     entries: HashMap<String, CachedSessionMetadata>,
 }
 
-const CACHE_VERSION: u32 = 8;
+const CACHE_VERSION: u32 = 9;
 
 /// Get the cache file path for a project
 fn get_cache_path(project_path: &str) -> PathBuf {
@@ -138,6 +141,8 @@ struct IncrementalParseState {
     first_assistant_text: Option<String>,
     /// Rename name from /rename command (already known)
     rename_name: Option<String>,
+    /// Originating client entrypoint (already known)
+    entrypoint: Option<String>,
 }
 
 /// Minimal struct for fast line classification (avoids full parsing)
@@ -171,6 +176,8 @@ struct SessionMetadataEntry {
     tool_use: Option<serde_json::Value>,
     #[serde(rename = "toolUseResult")]
     tool_use_result: Option<serde_json::Value>,
+    #[serde(rename = "entrypoint")]
+    entrypoint: Option<String>,
     message: Option<SessionMetadataMessage>,
 }
 
@@ -191,6 +198,8 @@ struct QuickLineClassifier {
     is_sidechain: Option<bool>,
     #[serde(rename = "isMeta")]
     is_meta: Option<bool>,
+    #[serde(rename = "entrypoint")]
+    entrypoint: Option<String>,
 }
 
 /// Fast session metadata extraction result
@@ -211,6 +220,8 @@ struct SessionExtractionResult {
     first_assistant_text: Option<String>,
     /// Rename name from /rename command (for caching)
     rename_name: Option<String>,
+    /// Originating client entrypoint (for caching)
+    entrypoint: Option<String>,
 }
 
 /// Fast session metadata extraction with two-phase parsing:
@@ -263,6 +274,7 @@ fn extract_session_metadata_internal(
         mut last_user_content,
         mut first_assistant_text,
         mut rename_name,
+        mut entrypoint,
     ) = if let Some(ref state) = incremental_state {
         (
             state.start_offset,
@@ -278,10 +290,11 @@ fn extract_session_metadata_internal(
             state.last_user_content.clone(),
             state.first_assistant_text.clone(),
             state.rename_name.clone(),
+            state.entrypoint.clone(),
         )
     } else {
         (
-            0u64, 0usize, 0usize, None, None, None, None, false, false, None, None, None, None,
+            0u64, 0usize, 0usize, None, None, None, None, false, false, None, None, None, None, None,
         )
     };
 
@@ -401,6 +414,13 @@ fn extract_session_metadata_internal(
                     }
                 }
 
+                // Track entrypoint
+                if entrypoint.is_none() {
+                    if let Some(ref ep) = entry.entrypoint {
+                        entrypoint = Some(ep.clone());
+                    }
+                }
+
                 // Extract first user message for summary fallback
                 // Note: last_user_content is tracked only within METADATA_PHASE_LINES (first 100 lines).
                 // For longer sessions, the actual last user message may be beyond this limit.
@@ -494,6 +514,13 @@ fn extract_session_metadata_internal(
                 last_timestamp = Some(ts);
             }
 
+            // Track entrypoint from quick classifier
+            if entrypoint.is_none() {
+                if let Some(ref ep) = classifier.entrypoint {
+                    entrypoint = Some(ep.clone());
+                }
+            }
+
             // Quick tool_use check via string search (faster than full parse)
             if !has_tool_use
                 && (line.contains("\"toolUse\"")
@@ -548,6 +575,7 @@ fn extract_session_metadata_internal(
             is_renamed: rename_name.is_some(),
             provider: None,
             storage_type: None,
+            entrypoint: entrypoint.clone(),
         },
         sidechain_count,
         final_byte_offset: file_size,
@@ -557,6 +585,7 @@ fn extract_session_metadata_internal(
         last_user_content,
         first_assistant_text,
         rename_name,
+        entrypoint,
     })
 }
 
@@ -644,6 +673,7 @@ fn recover_from_subagents(
             is_renamed: false,
             provider: None,
             storage_type: None,
+            entrypoint: None,
         },
         sidechain_count: 0,
         final_byte_offset: 0,
@@ -653,6 +683,7 @@ fn recover_from_subagents(
         last_user_content: None,
         first_assistant_text: None,
         rename_name: None,
+        entrypoint: None,
     })
 }
 
@@ -965,6 +996,7 @@ pub async fn load_project_sessions(
                             last_user_content: cached.last_user_content.clone(),
                             first_assistant_text: cached.first_assistant_text.clone(),
                             rename_name: cached.rename_name.clone(),
+                            entrypoint: session.entrypoint.clone(),
                         },
                     ));
                     continue;
@@ -1032,6 +1064,7 @@ pub async fn load_project_sessions(
                     last_user_content,
                     first_assistant_text,
                     cached_rename_name,
+                    cached_entrypoint,
                 ) = match &result_opt {
                     Some(result) => (
                         Some(result.session.clone()),
@@ -1043,8 +1076,9 @@ pub async fn load_project_sessions(
                         result.last_user_content.clone(),
                         result.first_assistant_text.clone(),
                         result.rename_name.clone(),
+                        result.entrypoint.clone(),
                     ),
-                    None => (None, 0, 0, false, false, None, None, None, None),
+                    None => (None, 0, 0, false, false, None, None, None, None, None),
                 };
 
                 cache.entries.insert(
@@ -1061,6 +1095,7 @@ pub async fn load_project_sessions(
                         last_user_content,
                         first_assistant_text,
                         rename_name: cached_rename_name,
+                        entrypoint: cached_entrypoint,
                     },
                 );
                 cache_updated = true;
@@ -1197,6 +1232,7 @@ pub async fn load_project_sessions(
                     is_renamed: false,
                     provider: None,
                     storage_type: None,
+                    entrypoint: None,
                 });
             }
         }

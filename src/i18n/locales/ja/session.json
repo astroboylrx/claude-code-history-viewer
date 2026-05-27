@@ -91,6 +91,7 @@
   "session.cliSync.title": "セッション名がCLIと同期済み",
   "session.copiedFilePath": "ファイルパスをコピーしました",
   "session.copiedResumeCommand": "再開コマンドをコピーしました",
+  "session.copiedResumeCommandNoCwd": "再開コマンドをコピーしました（作業ディレクトリ不明）",
   "session.copiedSessionId": "セッションIDをコピーしました",
   "session.copyFilePath": "ファイルパスをコピー",
   "session.showJsonlFile": "JSONLファイルを表示",
@@ -186,5 +187,13 @@
   "session.export.html": "HTML (.html)",
   "session.export.success": "エクスポートが完了しました",
   "session.export.error": "エクスポートに失敗しました",
-  "session.export.exporting": "エクスポート中..."
+  "session.export.exporting": "エクスポート中...",
+  "session.item.entrypoint.cli": "CLI",
+  "session.item.entrypoint.vscode": "VS Code",
+  "session.item.entrypoint.desktop": "Desktop",
+  "session.filter.source.label": "ソース:",
+  "session.filter.source.all": "すべて",
+  "session.filter.source.cli": "CLI",
+  "session.filter.source.vscode": "VS Code",
+  "session.filter.source.desktop": "Desktop"
 }

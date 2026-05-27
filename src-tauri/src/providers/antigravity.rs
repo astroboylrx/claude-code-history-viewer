@@ -421,6 +421,7 @@ pub fn load_sessions(path: &str, _exclude_sidechain: bool) -> Result<Vec<ClaudeS
             is_renamed: false,
             provider: Some("antigravity".to_string()),
             storage_type: None,
+            entrypoint: None,
         });
     }
 
@@ -428,31 +429,43 @@ pub fn load_sessions(path: &str, _exclude_sidechain: bool) -> Result<Vec<ClaudeS
     Ok(sessions)
 }
 
+fn admit_usage_jsonl(path: &std::path::Path) -> Option<std::path::PathBuf> {
+    let meta = std::fs::symlink_metadata(path).ok()?;
+    if meta.file_type().is_symlink() || !meta.is_file() {
+        return None;
+    }
+    Some(path.to_path_buf())
+}
+
+pub(crate) fn resolve_usage_jsonl_path(session_path: &str) -> Option<std::path::PathBuf> {
+    let dir = std::path::PathBuf::from(session_path);
+
+    if let Ok(canonical_dir) = std::fs::canonicalize(&dir) {
+        if marker_rooted_path(&canonical_dir.to_string_lossy()).is_some() {
+            if let Some(path) = admit_usage_jsonl(&canonical_dir.join("usage.jsonl")) {
+                return Some(path);
+            }
+        }
+    }
+
+    let root = marker_rooted_path(session_path)?;
+    let session_id = dir.file_name()?.to_string_lossy().to_string();
+    admit_usage_jsonl(
+        &get_antigravity_rpc_cache_root(&root)
+            .join(&session_id)
+            .join("usage.jsonl"),
+    )
+}
+
 /// Map each usage record in a session's usage.jsonl to a pair of `ClaudeMessages`.
 pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
-    let dir = std::path::PathBuf::from(session_path);
-    let session_id = dir
+    let session_id = std::path::PathBuf::from(session_path)
         .file_name()
         .map(|f| f.to_string_lossy().to_string())
         .unwrap_or_default();
 
-    let root = match marker_rooted_path(session_path) {
-        Some(root) => root,
-        None => return Ok(vec![]),
-    };
-
-    let usage_path = dir.join("usage.jsonl");
-    let usage_path = if usage_path.exists() {
-        usage_path
-    } else {
-        let rpc_cache = get_antigravity_rpc_cache_root(&root)
-            .join(&session_id)
-            .join("usage.jsonl");
-        if rpc_cache.exists() {
-            rpc_cache
-        } else {
-            return Ok(vec![]);
-        }
+    let Some(usage_path) = resolve_usage_jsonl_path(session_path) else {
+        return Ok(vec![]);
     };
 
     let content = std::fs::read_to_string(&usage_path)

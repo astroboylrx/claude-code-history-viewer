@@ -248,7 +248,7 @@ export const ArchiveCreateDialog: React.FC<ArchiveCreateDialogProps> = ({
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{project.name}</p>
                         <p className="text-2xs text-muted-foreground truncate">
-                          {isClaude ? project.actual_path : `${project.provider} — ${t('archive.create.unsupportedProvider')}`}
+                          {isClaude ? project.actual_path : `${project.provider ?? 'claude'} — ${t('archive.create.unsupportedProvider')}`}
                         </p>
                       </div>
                       {isClaude && (

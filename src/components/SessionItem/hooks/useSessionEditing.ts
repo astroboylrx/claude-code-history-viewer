@@ -186,9 +186,14 @@ export function useSessionEditing(session: ClaudeSession) {
     [handleCopyToClipboard, session.actual_session_id, t]
   );
 
+  const projectCwd = useAppStore(
+    (state) =>
+      state.projects.find((p) => p.name === session.project_name)?.actual_path
+  );
+
   const handleCopyResumeCommand = useCallback(
     (e: React.MouseEvent) => {
-      const resumeCommand = getResumeCommand(providerId, session.actual_session_id);
+      const resumeCommand = getResumeCommand(providerId, session.actual_session_id, projectCwd);
       if (!resumeCommand) {
         e.stopPropagation();
         setIsContextMenuOpen(false);
@@ -199,10 +204,15 @@ export function useSessionEditing(session: ClaudeSession) {
       return handleCopyToClipboard(
         e,
         resumeCommand,
-        t("session.copiedResumeCommand", "Resume command copied")
+        projectCwd
+          ? t("session.copiedResumeCommand", "Resume command copied")
+          : t(
+              "session.copiedResumeCommandNoCwd",
+              "Resume command copied (working directory unknown)"
+            )
       );
     },
-    [handleCopyToClipboard, providerId, session.actual_session_id, t]
+    [handleCopyToClipboard, projectCwd, providerId, session.actual_session_id, t]
   );
 
   const handleCopyFilePath = useCallback(
@@ -262,8 +272,16 @@ export function useSessionEditing(session: ClaudeSession) {
           setSelectedSession(null);
         }
         toast.success(t("session.deleteSuccess", "Session deleted"));
-      } catch {
-        toast.error(t("session.deleteError", "Failed to delete session"));
+      } catch (error) {
+        const description =
+          error instanceof Error ? error.message : String(error);
+        console.error("[session delete] failed", {
+          sessionId: session.session_id,
+          error,
+        });
+        toast.error(t("session.deleteError", "Failed to delete session"), {
+          description,
+        });
       }
     },
     [session.file_path, session.session_id, supportsSessionDeletion, t]

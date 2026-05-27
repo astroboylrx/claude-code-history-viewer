@@ -38,14 +38,18 @@ export const NativeRenameDialog: React.FC<NativeRenameDialogProps> = ({
   const [title, setTitle] = useState("");
   const inputId = useId();
   const isOpenCode = provider === "opencode";
+  const isForgeCode = provider === "forgecode";
+  const usesStandaloneTitlePreview = isOpenCode || isForgeCode;
 
-  // Extract existing title if present
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (usesStandaloneTitlePreview) {
+      setTitle(currentName);
+    } else {
       const match = currentName.match(/^\[(.+?)\]/);
       setTitle(match?.[1] ?? "");
     }
-  }, [open, currentName]);
+  }, [open, currentName, usesStandaloneTitlePreview]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

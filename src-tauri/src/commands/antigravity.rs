@@ -87,7 +87,7 @@ pub fn antigravity_root_from_path(path: &str) -> Option<PathBuf> {
         }
     }
 
-    default_root
+    None
 }
 
 /// Returns the RPC cache root path for a given antigravity root.
@@ -406,13 +406,18 @@ fn scan_brain_candidates(root: &Path) -> Result<Vec<SessionCandidate>, String> {
         }
 
         let session_id = entry.file_name().to_string_lossy().to_string();
+        if !is_valid_antigravity_session_id(&session_id) {
+            continue;
+        }
         let session_dir = entry.path();
         let mut file_paths = Vec::new();
         collect_files(&session_dir, &mut file_paths)?;
 
         let pb_path = conversations_dir.join(format!("{session_id}.pb"));
-        if pb_path.exists() {
-            file_paths.push(pb_path);
+        if let Ok(meta) = std::fs::symlink_metadata(&pb_path) {
+            if !meta.file_type().is_symlink() && meta.file_type().is_file() {
+                file_paths.push(pb_path);
+            }
         }
 
         let mut last_modified_ms = 0;
@@ -469,6 +474,12 @@ fn parse_token_files(token_file_paths: &[PathBuf]) -> (RpcSessionAggregate, u32,
             .and_then(|ext| ext.to_str())
             .unwrap_or_default()
             .to_ascii_lowercase();
+        let Ok(meta) = std::fs::symlink_metadata(file_path) else {
+            continue;
+        };
+        if !meta.file_type().is_file() {
+            continue;
+        }
         let Ok(content) = std::fs::read_to_string(file_path) else {
             continue;
         };
@@ -627,22 +638,21 @@ fn build_state_from_token_monitor_sources(root: &Path) -> Result<AntigravityStat
             )
         };
 
-        let persisted = if has_rpc_artifact {
-            build_session_state(
-                &candidate.session_id,
-                &candidate.session_dir,
-                &rpc_dir,
-                &candidate.label_hint,
-                &token_file_paths,
-                effective_last_modified,
-                source,
-                SessionLifecycleStatus::Active,
-            )
+        let storage_dir = if has_rpc_artifact {
+            rpc_dir.clone()
         } else {
-            // brain/ session without rpc-cache data — skip; rpc cache scan will find it
-            // if it later has real data files
-            continue;
+            candidate.session_dir.clone()
         };
+        let persisted = build_session_state(
+            &candidate.session_id,
+            &candidate.session_dir,
+            &storage_dir,
+            &candidate.label_hint,
+            &token_file_paths,
+            effective_last_modified,
+            source,
+            SessionLifecycleStatus::Active,
+        );
         seen_ids.insert(candidate.session_id.clone());
         sessions.insert(candidate.session_id, persisted);
     }
@@ -659,6 +669,9 @@ fn build_state_from_token_monitor_sources(root: &Path) -> Result<AntigravityStat
                 continue;
             }
             let session_id = entry.file_name().to_string_lossy().to_string();
+            if !is_valid_antigravity_session_id(&session_id) {
+                continue;
+            }
             if seen_ids.contains(&session_id) {
                 continue;
             }
@@ -724,7 +737,8 @@ pub fn load_state_file(path: &Path) -> Result<AntigravityState, String> {
 /// 读取活跃状态 `monitor-state.json`
 pub fn load_active_state(root: &Path) -> Option<AntigravityState> {
     let active_path = root.join("monitor-state.json");
-    if !active_path.exists() {
+    let meta = std::fs::symlink_metadata(&active_path).ok()?;
+    if meta.file_type().is_symlink() || !meta.file_type().is_file() {
         return None;
     }
     load_state_file(&active_path).ok()
@@ -746,7 +760,14 @@ pub fn load_archive_states(root: &Path) -> Vec<AntigravityState> {
                 .extension()
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
         {
-            if let Ok(state) = load_state_file(&entry.path()) {
+            let archive_path = entry.path();
+            let Ok(meta) = std::fs::symlink_metadata(&archive_path) else {
+                continue;
+            };
+            if meta.file_type().is_symlink() || !meta.file_type().is_file() {
+                continue;
+            }
+            if let Ok(state) = load_state_file(&archive_path) {
                 named.push((name_str, state));
             }
         }
@@ -772,6 +793,7 @@ pub fn merge_states(
     }
 
     // Active overrides archives
+    let last_poll_at = active.as_ref().and_then(|a| a.last_poll_at);
     if let Some(active_state) = active {
         for (id, session) in active_state.sessions {
             merged.insert(id, session);
@@ -779,7 +801,7 @@ pub fn merge_states(
     }
 
     AntigravityState {
-        last_poll_at: None,
+        last_poll_at,
         sessions: merged,
     }
 }
@@ -902,7 +924,6 @@ pub async fn get_antigravity_project_summary(
     let root = root_path
         .as_deref()
         .and_then(antigravity_root_from_path)
-        .or_else(|| root_path.as_ref().map(PathBuf::from))
         .or_else(resolve_antigravity_root)
         .ok_or("Cannot determine antigravity root directory")?;
     let state = load_antigravity_state_impl(&root)?;
@@ -996,6 +1017,32 @@ mod tests {
     fn test_merge_states_empty() {
         let merged = merge_states(vec![], None);
         assert!(merged.sessions.is_empty());
+        assert!(merged.last_poll_at.is_none());
+    }
+
+    #[test]
+    fn test_merge_states_preserves_active_last_poll_at() {
+        let archive = AntigravityState {
+            last_poll_at: None,
+            sessions: HashMap::new(),
+        };
+        let active = AntigravityState {
+            last_poll_at: Some(1_700_000_002_000),
+            sessions: HashMap::new(),
+        };
+
+        let merged = merge_states(vec![archive], Some(active));
+        assert_eq!(merged.last_poll_at, Some(1_700_000_002_000));
+    }
+
+    #[test]
+    fn test_merge_states_no_active_drops_archive_last_poll_at() {
+        let archive = AntigravityState {
+            last_poll_at: Some(1_700_000_000_000),
+            sessions: HashMap::new(),
+        };
+        let merged = merge_states(vec![archive], None);
+        assert!(merged.last_poll_at.is_none());
     }
 
     #[test]
@@ -1091,6 +1138,109 @@ mod tests {
     fn test_load_antigravity_state_impl_missing_dir() {
         let state = load_antigravity_state_impl(Path::new("/nonexistent/path/xyz")).unwrap();
         assert!(state.sessions.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_load_active_state_rejects_symlink() {
+        let dir = TempDir::new().unwrap();
+        let target = dir.path().join("real-state.json");
+        let state = AntigravityState::default();
+        std::fs::write(&target, serde_json::to_string(&state).unwrap()).unwrap();
+
+        let root = dir.path().join("scan-root");
+        std::fs::create_dir(&root).unwrap();
+        std::os::unix::fs::symlink(&target, root.join("monitor-state.json")).unwrap();
+
+        assert!(load_active_state(&root).is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_load_archive_states_rejects_symlinked_archive() {
+        let dir = TempDir::new().unwrap();
+        let target = dir.path().join("real-archive.json");
+        let state = AntigravityState::default();
+        std::fs::write(&target, serde_json::to_string(&state).unwrap()).unwrap();
+
+        let root = dir.path().join("scan-root");
+        std::fs::create_dir(&root).unwrap();
+        std::os::unix::fs::symlink(&target, root.join("monitor-state.archive-2025-06.json"))
+            .unwrap();
+        std::fs::write(
+            root.join("monitor-state.archive-2025-07.json"),
+            serde_json::to_string(&state).unwrap(),
+        )
+        .unwrap();
+
+        let archives = load_archive_states(&root);
+        assert_eq!(archives.len(), 1);
+    }
+
+    #[test]
+    fn test_antigravity_root_from_path_returns_none_when_marker_absent() {
+        let dir = TempDir::new().unwrap();
+        let unrelated_dir = dir.path().join("not-antigravity");
+        std::fs::create_dir(&unrelated_dir).unwrap();
+
+        let resolved = antigravity_root_from_path(&unrelated_dir.to_string_lossy());
+        assert!(
+            resolved.is_none(),
+            "expected None for marker-absent path, got {resolved:?}",
+        );
+    }
+
+    #[test]
+    fn test_antigravity_root_from_path_finds_marker_in_parent() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("project");
+        std::fs::create_dir_all(root.join(".token-monitor").join("rpc-cache").join("v1")).unwrap();
+        let nested = root.join("brain").join("sess-x");
+        std::fs::create_dir_all(&nested).unwrap();
+
+        let resolved = antigravity_root_from_path(&nested.to_string_lossy()).unwrap();
+        assert_eq!(resolved, root);
+    }
+
+    #[test]
+    fn test_build_state_includes_filesystem_only_brain_session() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+
+        std::fs::create_dir_all(root.join(".token-monitor").join("rpc-cache").join("v1")).unwrap();
+        let session_dir = root.join("brain").join("sess-fs");
+        std::fs::create_dir_all(&session_dir).unwrap();
+        std::fs::write(session_dir.join("task.md"), "# Test session\n").unwrap();
+
+        let state = build_state_from_token_monitor_sources(root).unwrap();
+        assert!(state.sessions.contains_key("sess-fs"));
+        let session = state.sessions.get("sess-fs").unwrap();
+        assert_eq!(session.latest.source, "filesystem");
+        assert_eq!(
+            session.latest.file_path,
+            session_dir.to_string_lossy().to_string()
+        );
+    }
+
+    #[test]
+    fn test_scan_brain_candidates_rejects_invalid_session_id() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+
+        let brain_dir = root.join("brain");
+        std::fs::create_dir_all(&brain_dir).unwrap();
+        for bad in ["..weird", "has space", "has.dot", "has+plus"] {
+            let s = brain_dir.join(bad);
+            std::fs::create_dir_all(&s).unwrap();
+            std::fs::write(s.join("task.md"), "# bad\n").unwrap();
+        }
+        let good = brain_dir.join("good-session-1");
+        std::fs::create_dir_all(&good).unwrap();
+        std::fs::write(good.join("task.md"), "# good\n").unwrap();
+
+        let candidates = scan_brain_candidates(root).unwrap();
+        let ids: Vec<&str> = candidates.iter().map(|c| c.session_id.as_str()).collect();
+        assert_eq!(ids, vec!["good-session-1"]);
     }
 
     #[test]

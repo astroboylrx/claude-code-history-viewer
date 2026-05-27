@@ -55,6 +55,7 @@ use crate::commands::{
     unified_presets::{
         delete_unified_preset, get_unified_preset, load_unified_presets, save_unified_preset,
     },
+    update::force_quit_and_relaunch,
     watcher::{start_file_watcher, stop_file_watcher},
     wsl::{detect_wsl_distros, is_wsl_available},
 };
@@ -207,6 +208,8 @@ fn run_tauri() {
             // File watcher commands
             start_file_watcher,
             stop_file_watcher,
+            // Updater fallback
+            force_quit_and_relaunch,
             // Multi-provider commands
             detect_providers,
             scan_all_projects,

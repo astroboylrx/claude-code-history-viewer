@@ -258,9 +258,28 @@ export function useUpdater(): UseUpdaterReturn {
 
       if (downloadCompleted) {
         console.warn(
-          '[Updater] Download completed but install/relaunch failed (known Tauri v2 macOS issue). Guiding user to restart manually.',
+          '[Updater] Download completed but install/relaunch failed (known Tauri v2 macOS issue). Trying force-relaunch fallback.',
           error
         );
+
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          await invoke('force_quit_and_relaunch');
+          setState((prev) => ({
+            ...prev,
+            isDownloading: false,
+            isInstalling: false,
+            isRestarting: true,
+            requiresManualRestart: false,
+            error: null,
+          }));
+          return;
+        } catch (fallbackError) {
+          console.warn(
+            '[Updater] force_quit_and_relaunch fallback failed; falling back to manual restart UX.',
+            fallbackError
+          );
+        }
       } else {
         console.warn('[Updater] Download failed before completion.', {
           rawErrorMessage,

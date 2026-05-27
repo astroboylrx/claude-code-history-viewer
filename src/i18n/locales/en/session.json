@@ -91,6 +91,7 @@
   "session.cliSync.title": "Session name synced with CLI",
   "session.copiedFilePath": "File path copied",
   "session.copiedResumeCommand": "Resume command copied",
+  "session.copiedResumeCommandNoCwd": "Resume command copied (working directory unknown)",
   "session.copiedSessionId": "Session ID copied",
   "session.copyFilePath": "Copy File Path",
   "session.showJsonlFile": "Show JSONL File",
@@ -186,5 +187,13 @@
   "session.export.html": "HTML (.html)",
   "session.export.success": "Exported successfully",
   "session.export.error": "Export failed",
-  "session.export.exporting": "Exporting..."
+  "session.export.exporting": "Exporting...",
+  "session.item.entrypoint.cli": "CLI",
+  "session.item.entrypoint.vscode": "VS Code",
+  "session.item.entrypoint.desktop": "Desktop",
+  "session.filter.source.label": "Source:",
+  "session.filter.source.all": "All",
+  "session.filter.source.cli": "CLI",
+  "session.filter.source.vscode": "VS Code",
+  "session.filter.source.desktop": "Desktop"
 }

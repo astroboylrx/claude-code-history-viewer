@@ -138,16 +138,12 @@ fn antigravity_chat_token_breakdown(value: &serde_json::Value) -> Option<(u64, u
     if total_tokens == 0 {
         return None;
     }
-    let chat_tokens = token_breakdown["groups"]
-        .as_array()
-        .map(|groups| {
-            groups
-                .iter()
-                .filter(|group| group["type"].as_str() == Some("TOKEN_TYPE_CHAT_MESSAGES"))
-                .map(|group| group["numTokens"].as_u64().unwrap_or(0))
-                .sum::<u64>()
-        })
-        .unwrap_or(0)
+    let groups = token_breakdown["groups"].as_array()?;
+    let chat_tokens = groups
+        .iter()
+        .filter(|group| group["type"].as_str() == Some("TOKEN_TYPE_CHAT_MESSAGES"))
+        .map(|group| group["numTokens"].as_u64().unwrap_or(0))
+        .sum::<u64>()
         .min(total_tokens);
     Some((chat_tokens, total_tokens))
 }
@@ -1265,10 +1261,9 @@ fn build_tool_usage_stats(tool_usage: HashMap<String, (u32, u32)>) -> Vec<ToolUs
 fn load_antigravity_usage_records(
     session_path: &str,
 ) -> Result<Vec<AntigravityUsageRecord>, String> {
-    let usage_path = PathBuf::from(session_path).join("usage.jsonl");
-    if !usage_path.exists() {
+    let Some(usage_path) = providers::antigravity::resolve_usage_jsonl_path(session_path) else {
         return Ok(vec![]);
-    }
+    };
 
     let content = fs::read_to_string(&usage_path)
         .map_err(|e| format!("Failed to read {}: {}", usage_path.display(), e))?;
@@ -1781,7 +1776,13 @@ fn get_provider_project_stats_summary(
             summary.token_distribution.reasoning += session_stats.total_reasoning_tokens;
 
             if let Ok(messages) = providers::antigravity::load_messages(&session.file_path) {
+                let has_date_filter = s_limit.is_some() || e_limit.is_some();
                 for message in &messages {
+                    if has_date_filter
+                        && !is_within_date_limits(parse_timestamp_utc(&message.timestamp), s_limit.as_ref(), e_limit.as_ref())
+                    {
+                        continue;
+                    }
                     track_tool_usage(message, &mut tool_usage_map);
                 }
             }
@@ -2594,6 +2595,7 @@ pub async fn get_project_stats_summary(
         summary.token_distribution.output += stats.token_distribution.output;
         summary.token_distribution.cache_creation += stats.token_distribution.cache_creation;
         summary.token_distribution.cache_read += stats.token_distribution.cache_read;
+        summary.token_distribution.reasoning += stats.token_distribution.reasoning;
 
         // Aggregate tool usage
         for (name, (usage, success)) in stats.tool_usage {
@@ -3169,6 +3171,7 @@ pub async fn get_global_stats_summary(
         summary.token_distribution.output += stats.token_distribution.output;
         summary.token_distribution.cache_creation += stats.token_distribution.cache_creation;
         summary.token_distribution.cache_read += stats.token_distribution.cache_read;
+        summary.token_distribution.reasoning += stats.token_distribution.reasoning;
 
         // Aggregate tool usage
         for (name, (usage, success)) in stats.tool_usage {

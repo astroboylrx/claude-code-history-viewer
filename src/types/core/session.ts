@@ -80,6 +80,8 @@ export interface ClaudeSession {
   provider?: ProviderId;
   /** Storage type (json, sqlite) — OpenCode only */
   storage_type?: "json" | "sqlite";
+  /** Originating client for Claude Code sessions: "cli" / "claude-vscode" / "claude-desktop" */
+  entrypoint?: string;
 }
 
 // ============================================================================

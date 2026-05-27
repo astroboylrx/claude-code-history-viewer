@@ -450,6 +450,7 @@ fn load_sessions_from_db(base_path: &str, workspace_id: &str) -> Option<Vec<Clau
                 is_renamed: false,
                 provider: Some(PROVIDER_ID.to_string()),
                 storage_type: Some(STORAGE_TYPE.to_string()),
+                entrypoint: None,
             }
         })
         .collect();
@@ -1643,10 +1644,9 @@ fn parse_conversation_path(session_path: &str) -> Option<(String, String)> {
 /// Validate a single `ForgeCode` virtual path component.
 fn is_valid_virtual_component(value: &str) -> bool {
     !value.is_empty()
-        && value != "."
-        && value != ".."
-        && !value.contains('/')
-        && !value.contains('\\')
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 /// Quote an `SQLite` identifier for generated `ForgeCode` queries.
@@ -1796,7 +1796,28 @@ mod tests {
     use rusqlite::params;
     use tempfile::TempDir;
 
-    /// Create a temporary `ForgeCode` test database.
+    struct EnvGuard {
+        key: &'static str,
+        original: Option<std::ffi::OsString>,
+    }
+
+    impl EnvGuard {
+        fn set(key: &'static str, value: impl AsRef<std::ffi::OsStr>) -> Self {
+            let original = std::env::var_os(key);
+            std::env::set_var(key, value);
+            Self { key, original }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match &self.original {
+                Some(v) => std::env::set_var(self.key, v),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
+
     fn create_test_db(tmp: &TempDir) -> Connection {
         let db_path = tmp.path().join(".forge.db");
         let conn = Connection::open(db_path).expect("create forgecode test db");
@@ -2181,16 +2202,9 @@ mod tests {
     fn detection_prefers_forge_config_and_checks_artifacts() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join(".forge_history"), "history").unwrap();
-        let original = std::env::var("FORGE_CONFIG").ok();
-        std::env::set_var("FORGE_CONFIG", tmp.path());
+        let _guard = EnvGuard::set("FORGE_CONFIG", tmp.path());
 
         let detected = detect().unwrap();
-
-        if let Some(original) = original {
-            std::env::set_var("FORGE_CONFIG", original);
-        } else {
-            std::env::remove_var("FORGE_CONFIG");
-        }
 
         assert_eq!(detected.id, "forgecode");
         assert_eq!(detected.display_name, "ForgeCode");
@@ -2323,6 +2337,31 @@ mod tests {
         assert_eq!(
             parse_conversation_path("forgecode-db://workspace/ws-1/conversation/conv-1"),
             Some(("ws-1".to_string(), "conv-1".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_conversation_path_rejects_non_allowlist_components() {
+        assert_eq!(parse_conversation_path("forgecode://workspace/.."), None);
+        assert_eq!(parse_conversation_path("forgecode://workspace/."), None);
+        assert_eq!(
+            parse_conversation_path("forgecode://workspace/ws/conversation/../escape"),
+            None
+        );
+        assert_eq!(
+            parse_conversation_path("forgecode://workspace/ws 1/conversation/conv-1"),
+            None,
+            "spaces are rejected"
+        );
+        assert_eq!(
+            parse_conversation_path("forgecode://workspace/ws.1/conversation/conv-1"),
+            None,
+            "dots are rejected"
+        );
+        assert_eq!(
+            parse_conversation_path("forgecode://workspace/ws-1/conversation/conv:1"),
+            None,
+            "colons are rejected"
         );
     }
 }

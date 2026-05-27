@@ -91,6 +91,7 @@
   "session.cliSync.title": "会话名称已与CLI同步",
   "session.copiedFilePath": "文件路径已复制",
   "session.copiedResumeCommand": "恢复命令已复制",
+  "session.copiedResumeCommandNoCwd": "已复制恢复命令（工作目录未知）",
   "session.copiedSessionId": "会话ID已复制",
   "session.copyFilePath": "复制文件路径",
   "session.showJsonlFile": "显示 JSONL 文件",
@@ -186,5 +187,13 @@
   "session.export.html": "HTML (.html)",
   "session.export.success": "导出成功",
   "session.export.error": "导出失败",
-  "session.export.exporting": "正在导出..."
+  "session.export.exporting": "正在导出...",
+  "session.item.entrypoint.cli": "CLI",
+  "session.item.entrypoint.vscode": "VS Code",
+  "session.item.entrypoint.desktop": "Desktop",
+  "session.filter.source.label": "来源：",
+  "session.filter.source.all": "全部",
+  "session.filter.source.cli": "CLI",
+  "session.filter.source.vscode": "VS Code",
+  "session.filter.source.desktop": "Desktop"
 }

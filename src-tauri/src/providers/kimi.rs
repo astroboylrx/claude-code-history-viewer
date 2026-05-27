@@ -167,6 +167,7 @@ pub fn load_sessions(
             is_renamed: false,
             provider: Some("kimi".to_string()),
             storage_type: Some("jsonl".to_string()),
+            entrypoint: None,
         });
     }
 
