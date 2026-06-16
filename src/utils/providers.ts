@@ -15,7 +15,7 @@ const PROVIDER_TRANSLATIONS: Record<
   gemini: { key: "common.provider.gemini", fallback: "Gemini CLI" },
   antigravity: { key: "common.provider.antigravity", fallback: "Antigravity" },
   forgecode: { key: "common.provider.forgecode", fallback: "ForgeCode" },
-  kimi: { key: "common.provider.kimi", fallback: "Kimi CLI" },
+  kimi: { key: "common.provider.kimi", fallback: "Kimi" },
   opencode: { key: "common.provider.opencode", fallback: "OpenCode" },
 };
 

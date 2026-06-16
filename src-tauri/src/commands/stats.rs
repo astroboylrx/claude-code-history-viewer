@@ -272,7 +272,7 @@ fn detect_session_provider(session_path: &str) -> StatsProvider {
         return StatsProvider::ForgeCode;
     }
 
-    if session_path.starts_with("kimi://") {
+    if session_path.starts_with("kimi://") || session_path.contains(".kimi-code/") || session_path.contains("/.kimi/") {
         return StatsProvider::Kimi;
     }
 
