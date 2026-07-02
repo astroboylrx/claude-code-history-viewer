@@ -1009,11 +1009,7 @@ fn extract_session_metadata_v1(wire_path: &Path) -> (usize, String, Option<Strin
                     for item in user_input {
                         if item.get("type").and_then(Value::as_str) == Some("text") {
                             if let Some(text) = item.get("text").and_then(Value::as_str) {
-                                summary = Some(if text.len() > 100 {
-                                    format!("{}...", &text[..100])
-                                } else {
-                                    text.to_string()
-                                });
+                                summary = Some(truncate_safe(text, 100));
                                 break;
                             }
                         }
@@ -1075,11 +1071,7 @@ fn extract_session_metadata_v2(wire_path: &Path) -> (usize, String, Option<Strin
                     if c.get("type").and_then(Value::as_str) == Some("text") {
                         if let Some(text) = c.get("text").and_then(Value::as_str) {
                             if !text.is_empty() && !text.starts_with("<system>") {
-                                summary = Some(if text.len() > 100 {
-                                    format!("{}...", &text[..100])
-                                } else {
-                                    text.to_string()
-                                });
+                                summary = Some(truncate_safe(text, 100));
                                 break;
                             }
                         }
@@ -1111,11 +1103,7 @@ fn get_title_from_state_v2(session_dir: &Path) -> Option<String> {
     if title.is_empty() || title == "New Session" {
         return None;
     }
-    Some(if title.len() > 100 {
-        format!("{}...", &title[..100])
-    } else {
-        title.to_string()
-    })
+    Some(truncate_safe(title, 100))
 }
 
 fn get_project_name_from_state_v1(session_dir: &Path) -> Option<String> {
@@ -1177,6 +1165,13 @@ fn read_total_tokens_v1(session_dir: &Path) -> u64 {
         }
     }
     max_tokens
+}
+
+fn truncate_safe(s: &str, max: usize) -> String {
+    match s.char_indices().nth(max) {
+        Some((idx, _)) => format!("{}...", &s[..idx]),
+        None => s.to_string(),
+    }
 }
 
 fn timestamp_to_rfc3339(ts: Option<f64>) -> String {
