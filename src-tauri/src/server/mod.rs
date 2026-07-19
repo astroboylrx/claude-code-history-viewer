@@ -66,6 +66,10 @@ pub fn build_router(state: Arc<AppState>, host: &str, port: u16, dist_dir: Optio
         .route("/events", get(sse_handler))
         // Project commands
         .route("/get_claude_folder_path", post(h::get_claude_folder_path))
+        .route(
+            "/detect_claude_config_dir",
+            post(h::detect_claude_config_dir),
+        )
         .route("/validate_claude_folder", post(h::validate_claude_folder))
         .route(
             "/validate_custom_claude_dir",

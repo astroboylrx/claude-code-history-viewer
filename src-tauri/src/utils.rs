@@ -267,7 +267,7 @@ fn extract_cwd_from_project_dir(project_dir: &str) -> Option<String> {
 /// 2. Check `/Users/jack` (exists? continue)
 /// 3. Check `/Users/jack/client` (exists? continue)
 /// 4. Check `/Users/jack/client/claude-code-history-viewer` (exists? ✓ return this)
-fn decode_with_filesystem_check(encoded: &str) -> Option<String> {
+pub fn decode_with_filesystem_check(encoded: &str) -> Option<String> {
     decode_recursive(encoded, "")
 }
 
@@ -531,6 +531,32 @@ pub fn find_subagent_files(session_file_path: &Path) -> Vec<std::path::PathBuf> 
     files.sort();
     files.dedup();
     files
+}
+
+const MAX_SCAN_THREADS: usize = 8;
+
+pub fn par_map_bounded<T, R, F>(items: Vec<T>, f: F) -> Vec<R>
+where
+    T: Send,
+    R: Send,
+    F: Fn(T) -> R + Sync + Send,
+{
+    let threads = std::thread::available_parallelism()
+        .map(std::num::NonZeroUsize::get)
+        .unwrap_or(1)
+        .min(MAX_SCAN_THREADS);
+
+    if items.len() <= 1 || threads <= 1 {
+        return items.into_iter().map(f).collect();
+    }
+
+    match rayon::ThreadPoolBuilder::new().num_threads(threads).build() {
+        Ok(pool) => {
+            use rayon::prelude::*;
+            pool.install(|| items.into_par_iter().map(f).collect())
+        }
+        Err(_) => items.into_iter().map(f).collect(),
+    }
 }
 
 #[cfg(test)]

@@ -95,11 +95,73 @@ fn load_thread_titles_from_db(base_path: &str) -> HashMap<String, String> {
     titles
 }
 
-fn is_rollout_jsonl(path: &Path) -> bool {
+// Codex generates these filenames itself, always lowercase — a
+// case-insensitive comparison would accept files Codex never writes.
+#[allow(clippy::case_sensitive_file_extension_comparisons)]
+pub(crate) fn is_rollout_jsonl(path: &Path) -> bool {
     path.file_name()
-        .map(|name| name.to_string_lossy().starts_with("rollout-"))
-        .unwrap_or(false)
-        && path.extension().is_some_and(|ext| ext == "jsonl")
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| {
+            name.starts_with("rollout-")
+                && (name.ends_with(".jsonl") || name.ends_with(".jsonl.zst"))
+        })
+}
+
+/// Discovery filter for session walkers: accepts every rollout
+/// [`is_rollout_jsonl`] does, but skips a compressed `.jsonl.zst` whose plain
+/// `.jsonl` twin exists — Codex materializes the plain file for appends, so
+/// the plain one is the current version and listing both would duplicate the
+/// session.
+pub(crate) fn is_discoverable_rollout(path: &Path) -> bool {
+    if !is_rollout_jsonl(path) {
+        return false;
+    }
+    let is_compressed = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.ends_with(".jsonl.zst"));
+    if is_compressed {
+        // "rollout-….jsonl.zst" → "rollout-….jsonl"
+        let plain = path.with_extension("");
+        if plain.exists() {
+            return false;
+        }
+    }
+    true
+}
+
+/// Rollout file contents as a linear byte buffer: an mmap for plain `.jsonl`,
+/// a decompressed buffer for `.jsonl.zst` (Codex compresses old rollouts).
+enum RolloutBytes {
+    Mapped(Mmap),
+    Owned(Vec<u8>),
+}
+
+impl std::ops::Deref for RolloutBytes {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        match self {
+            RolloutBytes::Mapped(mmap) => mmap,
+            RolloutBytes::Owned(bytes) => bytes,
+        }
+    }
+}
+
+#[allow(unsafe_code)] // Required for mmap performance optimization
+fn read_rollout_bytes(path: &Path) -> Result<RolloutBytes, String> {
+    let file = File::open(path).map_err(|e| e.to_string())?;
+    let is_compressed = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.ends_with(".jsonl.zst"));
+    if is_compressed {
+        return zstd::decode_all(std::io::BufReader::new(file))
+            .map(RolloutBytes::Owned)
+            .map_err(|e| format!("Failed to decompress rollout: {e}"));
+    }
+    // SAFETY: File is read-only and we only read from the mapping
+    let mmap = unsafe { Mmap::map(&file) }.map_err(|e| e.to_string())?;
+    Ok(RolloutBytes::Mapped(mmap))
 }
 
 fn validate_session_path(session_path: &Path, raw_session_path: &str) -> Result<PathBuf, String> {
@@ -136,18 +198,18 @@ fn validate_session_path(session_path: &Path, raw_session_path: &str) -> Result<
 }
 
 /// Session metadata extracted from rollout files
-struct SessionInfo {
-    session_id: String,
-    cwd: Option<String>,
+pub(crate) struct SessionInfo {
+    pub(crate) session_id: String,
+    pub(crate) cwd: Option<String>,
     #[allow(dead_code)]
-    model: Option<String>,
-    message_count: usize,
-    first_message_time: String,
-    last_message_time: String,
-    last_modified: String,
-    file_path: String,
-    has_tool_use: bool,
-    summary: Option<String>,
+    pub(crate) model: Option<String>,
+    pub(crate) message_count: usize,
+    pub(crate) first_message_time: String,
+    pub(crate) last_message_time: String,
+    pub(crate) last_modified: String,
+    pub(crate) file_path: String,
+    pub(crate) has_tool_use: bool,
+    pub(crate) summary: Option<String>,
 }
 
 /// Scan Codex projects from a specific base path.
@@ -180,7 +242,7 @@ pub fn scan_projects_from_path(base_path: &str) -> Result<Vec<ClaudeProject>, St
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
-            .filter(|e| is_rollout_jsonl(e.path()))
+            .filter(|e| is_discoverable_rollout(e.path()))
         {
             let rollout_path = entry.path();
 
@@ -262,7 +324,7 @@ pub fn load_sessions(
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
-            .filter(|e| is_rollout_jsonl(e.path()))
+            .filter(|e| is_discoverable_rollout(e.path()))
         {
             let rollout_path = entry.path();
 
@@ -308,16 +370,8 @@ pub fn load_sessions(
 
 /// Load all messages from a Codex rollout file
 #[allow(unsafe_code)] // Required for mmap performance optimization
-pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
-    let path = Path::new(session_path);
-    if !path.exists() {
-        return Err(format!("Session file not found: {session_path}"));
-    }
-    let canonical_path = validate_session_path(path, session_path)?;
-
-    let file = File::open(&canonical_path).map_err(|e| e.to_string())?;
-    // SAFETY: File is read-only and we only read from the mapping
-    let mmap = unsafe { Mmap::map(&file) }.map_err(|e| e.to_string())?;
+pub(crate) fn parse_rollout_file(canonical_path: &Path) -> Result<Vec<ClaudeMessage>, String> {
+    let mmap = read_rollout_bytes(canonical_path)?;
     let ranges = find_line_ranges(&mmap);
 
     let mut messages = Vec::new();
@@ -448,6 +502,16 @@ pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
     Ok(messages)
 }
 
+/// Load messages from a Codex session file (public API with path validation).
+pub fn load_messages(session_path: &str) -> Result<Vec<ClaudeMessage>, String> {
+    let path = Path::new(session_path);
+    if !path.exists() {
+        return Err(format!("Session file not found: {session_path}"));
+    }
+    let canonical_path = validate_session_path(path, session_path)?;
+    parse_rollout_file(&canonical_path)
+}
+
 /// Search Codex sessions for a query string
 pub fn search(query: &str, limit: usize) -> Result<Vec<ClaudeMessage>, String> {
     let session_dirs = get_existing_session_dirs()?;
@@ -465,7 +529,7 @@ pub fn search(query: &str, limit: usize) -> Result<Vec<ClaudeMessage>, String> {
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
-            .filter(|e| is_rollout_jsonl(e.path()))
+            .filter(|e| is_discoverable_rollout(e.path()))
         {
             let rollout_path = entry.path();
 
@@ -493,10 +557,8 @@ pub fn search(query: &str, limit: usize) -> Result<Vec<ClaudeMessage>, String> {
 // ============================================================================
 
 #[allow(unsafe_code)] // Required for mmap performance optimization
-fn extract_session_info(rollout_path: &Path) -> Result<SessionInfo, String> {
-    let file = File::open(rollout_path).map_err(|e| e.to_string())?;
-    // SAFETY: File is read-only and we only read from the mapping
-    let mmap = unsafe { Mmap::map(&file) }.map_err(|e| e.to_string())?;
+pub(crate) fn extract_session_info(rollout_path: &Path) -> Result<SessionInfo, String> {
+    let mmap = read_rollout_bytes(rollout_path)?;
     let ranges = find_line_ranges(&mmap);
 
     let mut session_id = String::new();
@@ -615,6 +677,29 @@ fn extract_session_info(rollout_path: &Path) -> Result<SessionInfo, String> {
         file_path: rollout_path.to_string_lossy().to_string(),
         has_tool_use,
         summary,
+    })
+}
+
+/// Lightweight project-scan info extracted from a rollout file.
+pub(crate) struct ProjectScanInfo {
+    pub(crate) cwd: Option<String>,
+    pub(crate) message_count: usize,
+    pub(crate) last_modified: String,
+}
+
+/// Extract just the cwd from a rollout file (lighter than `extract_session_info`).
+pub(crate) fn extract_session_cwd(rollout_path: &Path) -> Result<Option<String>, String> {
+    let info = extract_session_info(rollout_path)?;
+    Ok(info.cwd)
+}
+
+/// Extract lightweight scan info (cwd, message_count, last_modified) from a rollout file.
+pub(crate) fn extract_project_scan_info(rollout_path: &Path) -> Result<ProjectScanInfo, String> {
+    let info = extract_session_info(rollout_path)?;
+    Ok(ProjectScanInfo {
+        cwd: info.cwd,
+        message_count: info.message_count,
+        last_modified: info.last_modified,
     })
 }
 

@@ -203,12 +203,13 @@ export const createProjectSlice: StateCreator<
       const customClaudePaths = get().userMetadata?.settings?.customClaudePaths;
       const hasCustomPaths = customClaudePaths != null && customClaudePaths.length > 0;
       const settings = get().userMetadata?.settings;
-      const projects = (hasNonClaudeProviders || hasCustomPaths)
+      const wslEnabled = settings?.wsl?.enabled ?? false;
+      const projects = (hasNonClaudeProviders || hasCustomPaths || wslEnabled)
         ? await api<ClaudeProject[]>("scan_all_projects", {
             claudePath,
             activeProviders: scanProviders,
             customClaudePaths: hasCustomPaths ? customClaudePaths : undefined,
-            wslEnabled: settings?.wsl?.enabled ?? false,
+            wslEnabled,
             wslExcludedDistros: settings?.wsl?.excludedDistros ?? [],
           })
         : await api<ClaudeProject[]>("scan_projects", {

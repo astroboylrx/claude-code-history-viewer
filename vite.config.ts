@@ -179,5 +179,13 @@ export default defineConfig(async () => {
       ["src-tauri/tests/**", "node"],
     ],
   },
+
+  // Prevent Vite from watching Tauri src directory
+  // Ref: https://tauri.app/start/create-project/
+  server: {
+    watch: {
+      ignored: ["**/src-tauri/target/**"],
+    },
+  },
 };
 });

@@ -32,14 +32,32 @@ pub async fn scan_all_projects(
         vec![
             "claude".to_string(),
             "codex".to_string(),
+            "continue".to_string(),
+            "pearai".to_string(),
+            "copilot".to_string(),
             "gemini".to_string(),
+            "goose".to_string(),
             "kimi".to_string(),
             "forgecode".to_string(),
             "opencode".to_string(),
+            "openinterpreter".to_string(),
+            "pi".to_string(),
+            "ompi".to_string(),
+            "qwen".to_string(),
             "cline".to_string(),
+            "crush".to_string(),
             "cursor".to_string(),
+            "cursor-agent".to_string(),
             "aider".to_string(),
+            "amazonq".to_string(),
             "antigravity".to_string(),
+            "codebuddy".to_string(),
+            "kiro".to_string(),
+            "llm".to_string(),
+            "zed".to_string(),
+            "openhands".to_string(),
+            "trae".to_string(),
+            "vibe".to_string(),
         ]
     });
 
@@ -180,6 +198,186 @@ pub async fn scan_all_projects(
         }
     }
 
+    // Continue.dev
+    if providers_to_scan.iter().any(|p| p == "continue") {
+        match providers::continue_dev::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Continue scan failed: {e}");
+            }
+        }
+    }
+
+    // PearAI
+    if providers_to_scan.iter().any(|p| p == "pearai") {
+        match providers::pearai::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("PearAI scan failed: {e}");
+            }
+        }
+    }
+
+    // Copilot (CLI + Desktop + VS Code)
+    if providers_to_scan.iter().any(|p| p == "copilot") {
+        match providers::copilot::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Copilot scan failed: {e}");
+            }
+        }
+    }
+
+    // Goose
+    if providers_to_scan.iter().any(|p| p == "goose") {
+        match providers::goose::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Goose scan failed: {e}");
+            }
+        }
+    }
+
+    // Open Interpreter
+    if providers_to_scan.iter().any(|p| p == "openinterpreter") {
+        match providers::openinterpreter::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Open Interpreter scan failed: {e}");
+            }
+        }
+    }
+
+    // Pi
+    if providers_to_scan.iter().any(|p| p == "pi") {
+        match providers::pi::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Pi scan failed: {e}");
+            }
+        }
+    }
+
+    // oh-my-pi
+    if providers_to_scan.iter().any(|p| p == "ompi") {
+        match providers::ompi::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("oh-my-pi scan failed: {e}");
+            }
+        }
+    }
+
+    // Qwen Code
+    if providers_to_scan.iter().any(|p| p == "qwen") {
+        match providers::qwen::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Qwen scan failed: {e}");
+            }
+        }
+    }
+
+    // Crush
+    if providers_to_scan.iter().any(|p| p == "crush") {
+        match providers::crush::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Crush scan failed: {e}");
+            }
+        }
+    }
+
+    // Cursor Agent
+    if providers_to_scan.iter().any(|p| p == "cursor-agent") {
+        match providers::cursor_agent::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Cursor Agent scan failed: {e}");
+            }
+        }
+    }
+
+    // Amazon Q Developer CLI
+    if providers_to_scan.iter().any(|p| p == "amazonq") {
+        match providers::amazon_q::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Amazon Q scan failed: {e}");
+            }
+        }
+    }
+
+    // CodeBuddy
+    if providers_to_scan.iter().any(|p| p == "codebuddy") {
+        match providers::codebuddy::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("CodeBuddy scan failed: {e}");
+            }
+        }
+    }
+
+    // Kiro
+    if providers_to_scan.iter().any(|p| p == "kiro") {
+        match providers::kiro::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Kiro scan failed: {e}");
+            }
+        }
+    }
+
+    // llm (Simon Willison)
+    if providers_to_scan.iter().any(|p| p == "llm") {
+        match providers::llm::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("llm scan failed: {e}");
+            }
+        }
+    }
+
+    // Zed
+    if providers_to_scan.iter().any(|p| p == "zed") {
+        match providers::zed::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Zed scan failed: {e}");
+            }
+        }
+    }
+
+    // OpenHands
+    if providers_to_scan.iter().any(|p| p == "openhands") {
+        match providers::openhands::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("OpenHands scan failed: {e}");
+            }
+        }
+    }
+
+    // Trae IDE
+    if providers_to_scan.iter().any(|p| p == "trae") {
+        match providers::trae::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Trae scan failed: {e}");
+            }
+        }
+    }
+
+    // Mistral Vibe
+    if providers_to_scan.iter().any(|p| p == "vibe") {
+        match providers::vibe::scan_projects() {
+            Ok(projects) => all_projects.extend(projects),
+            Err(e) => {
+                log::warn!("Vibe scan failed: {e}");
+            }
+        }
+    }
+
     // WSL scanning (Claude only — other providers' load_sessions/load_messages
     // use native base paths internally, so WSL projects would be visible but
     // not loadable. Extending other providers requires base-path-aware loaders.)
@@ -253,14 +451,32 @@ pub async fn load_provider_sessions(
             Ok(sessions)
         }
         "codex" => providers::codex::load_sessions(&project_path, exclude),
+        "continue" => providers::continue_dev::load_sessions(&project_path, exclude),
+        "pearai" => providers::pearai::load_sessions(&project_path, exclude),
+        "copilot" => providers::copilot::load_sessions(&project_path, exclude),
         "gemini" => providers::gemini::load_sessions(&project_path, exclude),
+        "goose" => providers::goose::load_sessions(&project_path, exclude),
         "kimi" => providers::kimi::load_sessions(&project_path, exclude),
         "forgecode" => providers::forgecode::load_sessions(&project_path, exclude),
         "opencode" => providers::opencode::load_sessions(&project_path, exclude),
+        "openinterpreter" => providers::openinterpreter::load_sessions(&project_path, exclude),
+        "pi" => providers::pi::load_sessions(&project_path, exclude),
+        "ompi" => providers::ompi::load_sessions(&project_path, exclude),
+        "qwen" => providers::qwen::load_sessions(&project_path, exclude),
         "cline" => providers::cline::load_sessions(&project_path, exclude),
+        "crush" => providers::crush::load_sessions(&project_path, exclude),
         "cursor" => providers::cursor::load_sessions(&project_path, exclude),
+        "cursor-agent" => providers::cursor_agent::load_sessions(&project_path, exclude),
         "aider" => providers::aider::load_sessions(&project_path, exclude),
+        "amazonq" => providers::amazon_q::load_sessions(&project_path, exclude),
         "antigravity" => providers::antigravity::load_sessions(&project_path, exclude),
+        "codebuddy" => providers::codebuddy::load_sessions(&project_path, exclude),
+        "kiro" => providers::kiro::load_sessions(&project_path, exclude),
+        "llm" => providers::llm::load_sessions(&project_path, exclude),
+        "zed" => providers::zed::load_sessions(&project_path, exclude),
+        "openhands" => providers::openhands::load_sessions(&project_path, exclude),
+        "trae" => providers::trae::load_sessions(&project_path, exclude),
+        "vibe" => providers::vibe::load_sessions(&project_path, exclude),
         _ => Err(format!("Unknown provider: {provider}")),
     }
 }
@@ -283,14 +499,32 @@ pub async fn load_provider_messages(
             messages
         }
         "codex" => providers::codex::load_messages(&session_path)?,
+        "continue" => providers::continue_dev::load_messages(&session_path)?,
+        "pearai" => providers::pearai::load_messages(&session_path)?,
+        "copilot" => providers::copilot::load_messages(&session_path)?,
         "gemini" => providers::gemini::load_messages(&session_path)?,
+        "goose" => providers::goose::load_messages(&session_path)?,
         "kimi" => providers::kimi::load_messages(&session_path)?,
         "forgecode" => providers::forgecode::load_messages(&session_path)?,
         "opencode" => providers::opencode::load_messages(&session_path)?,
+        "openinterpreter" => providers::openinterpreter::load_messages(&session_path)?,
+        "pi" => providers::pi::load_messages(&session_path)?,
+        "ompi" => providers::ompi::load_messages(&session_path)?,
+        "qwen" => providers::qwen::load_messages(&session_path)?,
         "cline" => providers::cline::load_messages(&session_path)?,
+        "crush" => providers::crush::load_messages(&session_path)?,
         "cursor" => providers::cursor::load_messages(&session_path)?,
+        "cursor-agent" => providers::cursor_agent::load_messages(&session_path)?,
         "aider" => providers::aider::load_messages(&session_path)?,
+        "amazonq" => providers::amazon_q::load_messages(&session_path)?,
         "antigravity" => providers::antigravity::load_messages(&session_path)?,
+        "codebuddy" => providers::codebuddy::load_messages(&session_path)?,
+        "kiro" => providers::kiro::load_messages(&session_path)?,
+        "llm" => providers::llm::load_messages(&session_path)?,
+        "zed" => providers::zed::load_messages(&session_path)?,
+        "openhands" => providers::openhands::load_messages(&session_path)?,
+        "trae" => providers::trae::load_messages(&session_path)?,
+        "vibe" => providers::vibe::load_messages(&session_path)?,
         _ => return Err(format!("Unknown provider: {provider}")),
     };
 
@@ -319,14 +553,32 @@ pub async fn search_all_providers(
         vec![
             "claude".to_string(),
             "codex".to_string(),
+            "continue".to_string(),
+            "pearai".to_string(),
+            "copilot".to_string(),
             "gemini".to_string(),
+            "goose".to_string(),
             "kimi".to_string(),
             "forgecode".to_string(),
             "opencode".to_string(),
+            "openinterpreter".to_string(),
+            "pi".to_string(),
+            "ompi".to_string(),
+            "qwen".to_string(),
             "cline".to_string(),
+            "crush".to_string(),
             "cursor".to_string(),
+            "cursor-agent".to_string(),
             "aider".to_string(),
+            "amazonq".to_string(),
             "antigravity".to_string(),
+            "codebuddy".to_string(),
+            "kiro".to_string(),
+            "llm".to_string(),
+            "zed".to_string(),
+            "openhands".to_string(),
+            "trae".to_string(),
+            "vibe".to_string(),
         ]
     });
 
@@ -399,6 +651,26 @@ pub async fn search_all_providers(
         }
     }
 
+    // Continue.dev
+    if providers_to_search.iter().any(|p| p == "continue") {
+        match providers::continue_dev::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Continue search failed: {e}");
+            }
+        }
+    }
+
+    // PearAI
+    if providers_to_search.iter().any(|p| p == "pearai") {
+        match providers::pearai::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("PearAI search failed: {e}");
+            }
+        }
+    }
+
     // Gemini
     if providers_to_search.iter().any(|p| p == "gemini") {
         match providers::gemini::search(&query, max_results) {
@@ -409,12 +681,32 @@ pub async fn search_all_providers(
         }
     }
 
+    // Goose
+    if providers_to_search.iter().any(|p| p == "goose") {
+        match providers::goose::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Goose search failed: {e}");
+            }
+        }
+    }
+
     // Kimi
     if providers_to_search.iter().any(|p| p == "kimi") {
         match providers::kimi::search(&query, max_results) {
             Ok(results) => all_results.extend(results),
             Err(e) => {
                 log::warn!("Kimi search failed: {e}");
+            }
+        }
+    }
+
+    // Mistral Vibe
+    if providers_to_search.iter().any(|p| p == "vibe") {
+        match providers::vibe::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Vibe search failed: {e}");
             }
         }
     }
@@ -439,12 +731,62 @@ pub async fn search_all_providers(
         }
     }
 
+    // Open Interpreter
+    if providers_to_search.iter().any(|p| p == "openinterpreter") {
+        match providers::openinterpreter::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Open Interpreter search failed: {e}");
+            }
+        }
+    }
+
+    // Pi
+    if providers_to_search.iter().any(|p| p == "pi") {
+        match providers::pi::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Pi search failed: {e}");
+            }
+        }
+    }
+
+    // oh-my-pi
+    if providers_to_search.iter().any(|p| p == "ompi") {
+        match providers::ompi::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("oh-my-pi search failed: {e}");
+            }
+        }
+    }
+
+    // Qwen Code
+    if providers_to_search.iter().any(|p| p == "qwen") {
+        match providers::qwen::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Qwen search failed: {e}");
+            }
+        }
+    }
+
     // Cline
     if providers_to_search.iter().any(|p| p == "cline") {
         match providers::cline::search(&query, max_results) {
             Ok(results) => all_results.extend(results),
             Err(e) => {
                 log::warn!("Cline search failed: {e}");
+            }
+        }
+    }
+
+    // Crush
+    if providers_to_search.iter().any(|p| p == "crush") {
+        match providers::crush::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Crush search failed: {e}");
             }
         }
     }
@@ -459,6 +801,16 @@ pub async fn search_all_providers(
         }
     }
 
+    // Cursor Agent
+    if providers_to_search.iter().any(|p| p == "cursor-agent") {
+        match providers::cursor_agent::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Cursor Agent search failed: {e}");
+            }
+        }
+    }
+
     // Aider
     if providers_to_search.iter().any(|p| p == "aider") {
         match providers::aider::search(&query, max_results) {
@@ -469,12 +821,92 @@ pub async fn search_all_providers(
         }
     }
 
+    // Amazon Q Developer CLI
+    if providers_to_search.iter().any(|p| p == "amazonq") {
+        match providers::amazon_q::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Amazon Q search failed: {e}");
+            }
+        }
+    }
+
     // Antigravity
     if providers_to_search.iter().any(|p| p == "antigravity") {
         match providers::antigravity::search(&query, max_results) {
             Ok(results) => all_results.extend(results),
             Err(e) => {
                 log::warn!("Antigravity search failed: {e}");
+            }
+        }
+    }
+
+    // CodeBuddy
+    if providers_to_search.iter().any(|p| p == "codebuddy") {
+        match providers::codebuddy::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("CodeBuddy search failed: {e}");
+            }
+        }
+    }
+
+    // Kiro
+    if providers_to_search.iter().any(|p| p == "kiro") {
+        match providers::kiro::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Kiro search failed: {e}");
+            }
+        }
+    }
+
+    // llm (Simon Willison)
+    if providers_to_search.iter().any(|p| p == "llm") {
+        match providers::llm::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("llm search failed: {e}");
+            }
+        }
+    }
+
+    // Zed
+    if providers_to_search.iter().any(|p| p == "zed") {
+        match providers::zed::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Zed search failed: {e}");
+            }
+        }
+    }
+
+    // OpenHands
+    if providers_to_search.iter().any(|p| p == "openhands") {
+        match providers::openhands::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("OpenHands search failed: {e}");
+            }
+        }
+    }
+
+    // Trae IDE
+    if providers_to_search.iter().any(|p| p == "trae") {
+        match providers::trae::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Trae search failed: {e}");
+            }
+        }
+    }
+
+    // Copilot (CLI + Desktop + VS Code)
+    if providers_to_search.iter().any(|p| p == "copilot") {
+        match providers::copilot::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Copilot search failed: {e}");
             }
         }
     }

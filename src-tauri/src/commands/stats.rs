@@ -24,11 +24,13 @@ use std::time::SystemTime;
 enum StatsProvider {
     #[default]
     Claude,
+    Codebuddy,
     Codex,
     ForgeCode,
     OpenCode,
-    Antigravity,
     Kimi,
+    Antigravity,
+    Copilot,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,11 +59,13 @@ fn parse_stats_mode(stats_mode: Option<String>) -> StatsMode {
 fn stats_provider_id(provider: StatsProvider) -> &'static str {
     match provider {
         StatsProvider::Claude => "claude",
+        StatsProvider::Codebuddy => "codebuddy",
         StatsProvider::Codex => "codex",
         StatsProvider::ForgeCode => "forgecode",
         StatsProvider::OpenCode => "opencode",
-        StatsProvider::Antigravity => "antigravity",
         StatsProvider::Kimi => "kimi",
+        StatsProvider::Antigravity => "antigravity",
+        StatsProvider::Copilot => "copilot",
     }
 }
 
@@ -195,11 +199,13 @@ fn should_include_stats_message(message: &ClaudeMessage, mode: StatsMode) -> boo
 fn all_stats_providers() -> HashSet<StatsProvider> {
     [
         StatsProvider::Claude,
+        StatsProvider::Codebuddy,
         StatsProvider::Codex,
         StatsProvider::ForgeCode,
         StatsProvider::OpenCode,
-        StatsProvider::Antigravity,
         StatsProvider::Kimi,
+        StatsProvider::Antigravity,
+        StatsProvider::Copilot,
     ]
     .into_iter()
     .collect()
@@ -215,11 +221,13 @@ fn parse_active_stats_providers(active_providers: Option<Vec<String>>) -> HashSe
         .into_iter()
         .filter_map(|provider| match provider.as_str() {
             "claude" => Some(StatsProvider::Claude),
+            "codebuddy" => Some(StatsProvider::Codebuddy),
             "codex" => Some(StatsProvider::Codex),
             "forgecode" => Some(StatsProvider::ForgeCode),
             "opencode" => Some(StatsProvider::OpenCode),
-            "antigravity" => Some(StatsProvider::Antigravity),
             "kimi" => Some(StatsProvider::Kimi),
+            "antigravity" => Some(StatsProvider::Antigravity),
+            "copilot" => Some(StatsProvider::Copilot),
             _ => {
                 unknown.push(provider);
                 None
@@ -823,20 +831,24 @@ fn collect_provider_global_file_stats(
     let mut project_keys = HashSet::new();
 
     let projects = match provider {
+        StatsProvider::Codebuddy => providers::codebuddy::scan_projects().unwrap_or_default(),
         StatsProvider::Codex => providers::codex::scan_projects().unwrap_or_default(),
         StatsProvider::ForgeCode => providers::forgecode::scan_projects().unwrap_or_default(),
         StatsProvider::OpenCode => providers::opencode::scan_projects().unwrap_or_default(),
         StatsProvider::Antigravity => providers::antigravity::scan_projects().unwrap_or_default(),
         StatsProvider::Kimi => providers::kimi::scan_projects().unwrap_or_default(),
+        StatsProvider::Copilot => providers::copilot::scan_projects().unwrap_or_default(),
         StatsProvider::Claude => Vec::new(),
     };
 
     let provider_tag = match provider {
+        StatsProvider::Codebuddy => "codebuddy",
         StatsProvider::Codex => "codex",
         StatsProvider::ForgeCode => "forgecode",
         StatsProvider::OpenCode => "opencode",
         StatsProvider::Antigravity => "antigravity",
         StatsProvider::Kimi => "kimi",
+        StatsProvider::Copilot => "copilot",
         StatsProvider::Claude => "claude",
     };
 
@@ -848,6 +860,7 @@ fn collect_provider_global_file_stats(
         project_keys.insert(format!("{provider_tag}:{}", project.path));
 
         let sessions = match provider {
+            StatsProvider::Codebuddy => providers::codebuddy::load_sessions(&project.path, false),
             StatsProvider::Codex => providers::codex::load_sessions(&project.path, false),
             StatsProvider::ForgeCode => providers::forgecode::load_sessions(&project.path, false),
             StatsProvider::OpenCode => providers::opencode::load_sessions(&project.path, false),
@@ -855,6 +868,7 @@ fn collect_provider_global_file_stats(
                 providers::antigravity::load_sessions(&project.path, false)
             }
             StatsProvider::Kimi => providers::kimi::load_sessions(&project.path, false),
+            StatsProvider::Copilot => providers::copilot::load_sessions(&project.path, false),
             StatsProvider::Claude => Ok(Vec::new()),
         }
         .unwrap_or_default();
@@ -869,11 +883,13 @@ fn collect_provider_global_file_stats(
         .par_iter()
         .filter_map(|(project_name, file_path)| {
             let messages = match provider {
+                StatsProvider::Codebuddy => providers::codebuddy::load_messages(file_path),
                 StatsProvider::Codex => providers::codex::load_messages(file_path),
                 StatsProvider::ForgeCode => providers::forgecode::load_messages(file_path),
                 StatsProvider::OpenCode => providers::opencode::load_messages(file_path),
                 StatsProvider::Antigravity => providers::antigravity::load_messages(file_path),
                 StatsProvider::Kimi => providers::kimi::load_messages(file_path),
+                StatsProvider::Copilot => providers::copilot::load_messages(file_path),
                 StatsProvider::Claude => Ok(Vec::new()),
             }
             .unwrap_or_default();
@@ -1480,6 +1496,27 @@ fn resolve_provider_project_name(provider: StatsProvider, project_path: &str) ->
             }
             "Antigravity".to_string()
         }
+        StatsProvider::Codebuddy => {
+            if let Ok(projects) = providers::codebuddy::scan_projects() {
+                if let Some(project) = projects.into_iter().find(|p| p.path == project_path) {
+                    return project.name;
+                }
+            }
+            PathBuf::from(project_path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("Unknown")
+                .to_string()
+        }
+        StatsProvider::Copilot => providers::copilot::scan_projects()
+            .ok()
+            .and_then(|projects| {
+                projects
+                    .into_iter()
+                    .find(|project| project.path == project_path)
+                    .map(|project| project.name)
+            })
+            .unwrap_or_else(|| "Copilot".to_string()),
     }
 }
 
@@ -1526,6 +1563,30 @@ fn resolve_provider_project_name_from_session(
             resolve_provider_project_name(provider, &project_path)
         }
         StatsProvider::Antigravity => "Antigravity".to_string(),
+        StatsProvider::Codebuddy => {
+            if let Ok(projects) = providers::codebuddy::scan_projects() {
+                for project in projects {
+                    if let Ok(sessions) = providers::codebuddy::load_sessions(&project.path, false) {
+                        if sessions.iter().any(|s| s.file_path == session_path) {
+                            return project.name;
+                        }
+                    }
+                }
+            }
+            "CodeBuddy".to_string()
+        }
+        StatsProvider::Copilot => {
+            if let Ok(projects) = providers::copilot::scan_projects() {
+                for project in projects {
+                    if let Ok(sessions) = providers::copilot::load_sessions(&project.path, false) {
+                        if sessions.iter().any(|s| s.file_path == session_path) {
+                            return project.name;
+                        }
+                    }
+                }
+            }
+            "Copilot".to_string()
+        }
         StatsProvider::Claude => {
             let project_path = std::path::Path::new(session_path)
                 .parent()
@@ -1541,11 +1602,13 @@ fn load_provider_sessions_for_stats(
     project_path: &str,
 ) -> Result<Vec<crate::models::ClaudeSession>, String> {
     match provider {
+        StatsProvider::Codebuddy => providers::codebuddy::load_sessions(project_path, false),
         StatsProvider::Codex => providers::codex::load_sessions(project_path, false),
         StatsProvider::ForgeCode => providers::forgecode::load_sessions(project_path, false),
         StatsProvider::OpenCode => providers::opencode::load_sessions(project_path, false),
         StatsProvider::Antigravity => providers::antigravity::load_sessions(project_path, false),
         StatsProvider::Kimi => providers::kimi::load_sessions(project_path, false),
+        StatsProvider::Copilot => providers::copilot::load_sessions(project_path, false),
         StatsProvider::Claude => {
             Err("Claude sessions are handled by legacy stats path".to_string())
         }
@@ -1557,11 +1620,13 @@ fn load_provider_messages_for_stats(
     session: &crate::models::ClaudeSession,
 ) -> Result<Vec<ClaudeMessage>, String> {
     match provider {
+        StatsProvider::Codebuddy => providers::codebuddy::load_messages(&session.file_path),
         StatsProvider::Codex => providers::codex::load_messages(&session.file_path),
         StatsProvider::ForgeCode => providers::forgecode::load_messages(&session.file_path),
         StatsProvider::OpenCode => providers::opencode::load_messages(&session.file_path),
         StatsProvider::Antigravity => providers::antigravity::load_messages(&session.file_path),
         StatsProvider::Kimi => providers::kimi::load_messages(&session.file_path),
+        StatsProvider::Copilot => providers::copilot::load_messages(&session.file_path),
         StatsProvider::Claude => {
             Err("Claude messages are handled by legacy stats path".to_string())
         }
@@ -2224,6 +2289,8 @@ pub async fn get_session_token_stats(
             StatsProvider::OpenCode => providers::opencode::load_messages(&session_path)?,
             StatsProvider::Antigravity => providers::antigravity::load_messages(&session_path)?,
             StatsProvider::Kimi => providers::kimi::load_messages(&session_path)?,
+            StatsProvider::Codebuddy => providers::codebuddy::load_messages(&session_path)?,
+            StatsProvider::Copilot => providers::copilot::load_messages(&session_path)?,
             StatsProvider::Claude => Vec::new(),
         };
 

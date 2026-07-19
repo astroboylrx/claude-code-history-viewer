@@ -96,7 +96,7 @@
   "session.copyFilePath": "ファイルパスをコピー",
   "session.showJsonlFile": "JSONLファイルを表示",
   "session.revealError": "ファイルを表示できませんでした",
-  "session.deleteConfirm": "セッションファイルと関連するすべてのデータ（サブエージェント、ツール結果）がゴミ箱に移動されます。",
+  "session.deleteConfirm": "セッションファイルと関連するすべてのデータ（サブエージェント、ツール結果）が削除されます。可能な場合はゴミ箱に移動し、それ以外は完全に削除されます。",
   "session.deleteError": "セッションの削除に失敗しました",
   "session.deleteSession": "セッションを削除",
   "session.deleteSuccess": "セッションを削除しました",
