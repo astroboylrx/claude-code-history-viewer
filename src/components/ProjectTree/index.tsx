@@ -130,20 +130,11 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
   );
 
   const providerCounts = useMemo(() => {
-    const counts: Record<ProviderTabId, number> = {
-      all: projects.length,
-      aider: 0,
-      claude: 0,
-      cline: 0,
-      codex: 0,
-      cursor: 0,
-      gemini: 0,
-      kimi: 0,
-      opencode: 0,
-    };
+    const counts: Record<string, number> = { all: projects.length };
 
     for (const project of projects) {
-      counts[getProviderId(project.provider)] += 1;
+      const id = getProviderId(project.provider);
+      counts[id] = (counts[id] ?? 0) + 1;
     }
 
     return counts;
@@ -429,7 +420,10 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
       const isCurrentlySelected = selectedProject?.path === project.path;
 
       if (isCurrentlySelected) {
-        // Collapse only, keep project selected so dashboard stays visible
+        const currentView = useAppStore.getState().analytics.currentView;
+        if (currentView === "messages") {
+          onProjectSelect(project);
+        }
         setExpandedProjects((prev) => {
           const next = new Set(prev);
           next.delete(project.path);
@@ -453,7 +447,7 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
         }, 0);
       }
     },
-    [selectedProject, onProjectSelect, setExpandedProjects]
+    [selectedProject, onProjectSelect, setExpandedProjects, useAppStore]
   );
 
   const handleGlobalStatsClick = useCallback(() => {

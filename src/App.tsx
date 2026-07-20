@@ -295,6 +295,12 @@ function App() {
       const currentProject = useAppStore.getState().selectedProject;
 
       if (currentProject?.path === project.path) {
+        const currentView = useAppStore.getState().analytics.currentView;
+        if (currentView === "messages") {
+          useAppStore.getState().setSelectedSession(null);
+          setAnalyticsCurrentView("analytics");
+          return;
+        }
         clearProjectSelection();
         return;
       }
