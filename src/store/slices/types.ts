@@ -109,6 +109,9 @@ export interface AppStoreState {
   messages: ClaudeMessage[];
   pagination: PaginationState;
   isLoadingMessages: boolean;
+  messageTotalCount: number;
+  messageHasMore: boolean;
+  isLoadingMoreMessages: boolean;
   isLoadingTokenStats: boolean;
   sessionTokenStats: SessionTokenStats | null;
   sessionConversationTokenStats: SessionTokenStats | null;
@@ -217,6 +220,7 @@ export interface AppStoreActions {
   // Message actions
   selectSession: (session: ClaudeSession) => Promise<void>;
   refreshCurrentSession: () => Promise<void>;
+  loadMoreMessages: () => Promise<void>;
   loadSessionTokenStats: (sessionPath: string) => Promise<void>;
   loadProjectTokenStats: (projectPath: string) => Promise<void>;
   loadMoreProjectTokenStats: (projectPath: string) => Promise<void>;

@@ -1,4 +1,4 @@
-use crate::models::{ClaudeMessage, ClaudeProject, ClaudeSession};
+use crate::models::{ClaudeMessage, ClaudeProject, ClaudeSession, MessagePage};
 use crate::providers;
 use crate::utils::parse_rfc3339_utc;
 use serde::{Deserialize, Serialize};
@@ -413,6 +413,112 @@ fn load_non_claude_messages(
         "vibe" => providers::vibe::load_messages(session_path),
         _ => Err(format!("Unknown provider: {provider}")),
     }
+}
+
+/// Default / maximum page size for `load_provider_messages_paginated`.
+const DEFAULT_MESSAGE_PAGE_SIZE: usize = 200;
+const MAX_MESSAGE_PAGE_LIMIT: usize = 500;
+
+/// Chat-style slice over an already-materialized, chronologically ordered
+/// message list: `offset` counts messages already loaded from the NEWEST end,
+/// so offset 0 returns the newest `limit` messages and increasing offsets walk
+/// toward the beginning of the session.
+fn paginate_messages_chat_style(
+    mut messages: Vec<ClaudeMessage>,
+    offset: usize,
+    limit: usize,
+) -> MessagePage {
+    let total_count = messages.len();
+    let remaining = total_count.saturating_sub(offset);
+    let to_load = limit.min(remaining);
+    let start = remaining - to_load;
+    let page: Vec<ClaudeMessage> = messages.drain(start..remaining).collect();
+
+    MessagePage {
+        messages: page,
+        total_count,
+        has_more: start > 0,
+        next_offset: offset + to_load,
+    }
+}
+
+/// Paginated variant of `load_provider_messages` (chat-style: offset 0 = newest).
+///
+/// - `claude` uses the mmap fast path (`load_session_messages_paginated`):
+///   offsets are in PRE-merge index space (stable across pages, consistent with
+///   `get_session_message_count`), and tool-result merging is applied WITHIN
+///   the returned window. A `tool_result` whose matching `tool_use` lives in an
+///   older, unloaded page stays unmerged and renders via the standalone
+///   `tool_result` renderers — a boundary-only artifact.
+/// - Other providers materialize the full session server-side (as they always
+///   have), merge, then slice — bounding the IPC payload and frontend memory.
+#[tauri::command]
+pub async fn load_provider_messages_paginated(
+    provider: String,
+    session_path: String,
+    offset: Option<usize>,
+    limit: Option<usize>,
+    exclude_sidechain: Option<bool>,
+) -> Result<MessagePage, String> {
+    let offset = offset.unwrap_or(0);
+    let limit = limit
+        .unwrap_or(DEFAULT_MESSAGE_PAGE_SIZE)
+        .clamp(1, MAX_MESSAGE_PAGE_LIMIT);
+
+    if provider == "claude" {
+        let mut page = crate::commands::session::load_session_messages_paginated(
+            session_path,
+            offset,
+            limit,
+            exclude_sidechain,
+        )
+        .await?;
+        for m in &mut page.messages {
+            if m.provider.is_none() {
+                m.provider = Some("claude".to_string());
+            }
+        }
+        page.messages = merge_tool_execution_messages(page.messages);
+        return Ok(page);
+    }
+
+    let messages = load_non_claude_messages(&provider, &session_path)?;
+    let mut merged = merge_tool_execution_messages(messages);
+    if exclude_sidechain.unwrap_or(false) {
+        merged.retain(|m| !m.is_sidechain.unwrap_or(false));
+    }
+    Ok(paginate_messages_chat_style(merged, offset, limit))
+}
+
+/// Find how far from the NEWEST visible message a uuid sits (0 = newest).
+/// Returns `None` when the uuid is not present. Loading a chat-style window
+/// with `offset = 0, limit = result + 1` guarantees the message is included —
+/// this powers deep links (global search jumps) into unloaded regions without
+/// falling back to a full-session load.
+///
+/// Offsets are in the same index space as `load_provider_messages_paginated`
+/// for the given provider (pre-merge for claude, post-merge otherwise).
+#[tauri::command]
+pub async fn get_provider_message_offset(
+    provider: String,
+    session_path: String,
+    message_uuid: String,
+    exclude_sidechain: Option<bool>,
+) -> Result<Option<usize>, String> {
+    if provider == "claude" {
+        return crate::commands::session::get_session_message_offset(
+            session_path,
+            message_uuid,
+            exclude_sidechain,
+        );
+    }
+
+    let messages = load_non_claude_messages(&provider, &session_path)?;
+    let mut merged = merge_tool_execution_messages(messages);
+    if exclude_sidechain.unwrap_or(false) {
+        merged.retain(|m| !m.is_sidechain.unwrap_or(false));
+    }
+    Ok(merged.iter().rev().position(|m| m.uuid == message_uuid))
 }
 
 /// Search across all (or selected) providers

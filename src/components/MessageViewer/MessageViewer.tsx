@@ -123,9 +123,11 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
   const { t } = useTranslation();
   const scrollContainerRef = useRef<OverlayScrollbarsComponentRef>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const virtualHeaderRef = useRef<HTMLDivElement>(null);
 
   // Track when OverlayScrollbars is initialized
   const [scrollElementReady, setScrollElementReady] = useState(false);
+  const [virtualScrollMargin, setVirtualScrollMargin] = useState(0);
 
   // SubAgent 패널 접힘 상태 — MessageViewer에 lift해야 filter toggle 같은
   // 분기 재렌더(패널 자식 unmount)에서 유저 선택이 보존됨.
@@ -159,7 +161,12 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
     navigateBackToParent,
     // 메시지 로딩 상태 — 로딩 스피너 표시 조건
     isLoadingMessages,
+    messageHasMore,
+    isLoadingMoreMessages,
+    loadMoreMessages,
   } = useAppStore();
+
+  const isInSubagent = parentSessionStack.length > 0;
 
   // Apply role + content type filters
   const displayMessages = useMemo(() => {
@@ -372,6 +379,38 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
     };
   }, [scrollElementReady, selectedSession?.session_id]);
 
+  // Reserve a top scroll-margin equal to the sticky "all messages loaded"
+  // header height so the first virtualized rows aren't hidden behind it as a
+  // blank gap (#371).
+  const hasMessageListHeader = displayMessages.length > 0 && !sessionSearch.query;
+
+  useEffect(() => {
+    if (!hasMessageListHeader) {
+      setVirtualScrollMargin(0);
+      return;
+    }
+
+    const element = virtualHeaderRef.current;
+    if (!element) {
+      setVirtualScrollMargin(0);
+      return;
+    }
+
+    const updateMargin = () => {
+      setVirtualScrollMargin(Math.ceil(element.getBoundingClientRect().height));
+    };
+
+    updateMargin();
+
+    if (!("ResizeObserver" in window)) {
+      return;
+    }
+
+    const observer = new ResizeObserver(updateMargin);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [hasMessageListHeader]);
+
   // Virtual scrolling
   const {
     virtualizer,
@@ -379,6 +418,7 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
     virtualRows,
     totalSize,
     getScrollIndex,
+    rowTranslateOffset,
   } = useMessageVirtualization({
     messages: displayMessages,
     agentTaskGroups,
@@ -390,6 +430,10 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
     getScrollElement,
     hiddenMessageIds,
     isCaptureMode,
+    // Inside a subagent session every row is `isSidechain` but rendered at full
+    // height, so the height estimate must not collapse them to 0 (issue #334).
+    isInSubagent: parentSessionStack.length > 0,
+    scrollMargin: virtualScrollMargin,
   });
 
   // Set of selected message UUIDs for O(1) lookup
@@ -629,6 +673,34 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
       handleClearSearch();
     }
   }, [onNextMatch, onPrevMatch, handleClearSearch]);
+
+  // Infinite scroll: load more messages when user scrolls near the top.
+  // Uses a state-based guard (not a timer): only trigger after the user has
+  // been at the bottom and then scrolled back up. This prevents the initial
+  // scroll-to-bottom from prematurely triggering a load.
+  const firstVisibleIndex = virtualRows[0]?.index ?? -1;
+  const initialScrollDone = scrollReadyForSessionId === selectedSession?.session_id;
+  const hasBeenAwayFromTop = useRef(false);
+  const currentSessionId = selectedSession?.session_id;
+  useEffect(() => {
+    hasBeenAwayFromTop.current = false;
+  }, [currentSessionId]);
+
+  useEffect(() => {
+    if (!initialScrollDone) return;
+    if (firstVisibleIndex > 10) {
+      hasBeenAwayFromTop.current = true;
+    }
+    if (
+      hasBeenAwayFromTop.current &&
+      messageHasMore &&
+      !isLoadingMoreMessages &&
+      firstVisibleIndex >= 0 &&
+      firstVisibleIndex <= 3
+    ) {
+      void loadMoreMessages();
+    }
+  }, [initialScrollDone, messageHasMore, isLoadingMoreMessages, firstVisibleIndex, loadMoreMessages]);
 
   // 로딩 중일 때 로딩 표시 (isLoadingMessages 기반 — scrollReady 의존 제거로 빈 세션 무한 스피너 방지)
   if ((isLoading || isLoadingMessages) && messages.length === 0) {
@@ -1010,8 +1082,11 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
         )}
 
         {/* 메시지 목록 헤더 */}
-        {displayMessages.length > 0 && !sessionSearch.query && (
-          <div className="max-w-4xl mx-auto flex items-center justify-center py-4">
+        {hasMessageListHeader && (
+          <div
+            ref={virtualHeaderRef}
+            className="max-w-4xl mx-auto flex items-center justify-center py-4"
+          >
             <div className="text-sm text-muted-foreground">
               {t("messageViewer.allMessagesLoaded", {
                 count: messages.length,
@@ -1061,6 +1136,7 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
                   ref={virtualizer.measureElement}
                   virtualRow={virtualRow}
                   item={item}
+                  translateOffset={rowTranslateOffset}
                   isMatch={isMatch}
                   isCurrentMatch={isCurrentMatch}
                   searchQuery={sessionSearch.query}
@@ -1072,6 +1148,7 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
                   onRestoreAll={restoreMessages}
                   isSelected={itemIsSelected}
                   onRangeSelect={isCaptureMode ? handleRangeSelect : undefined}
+                  isInSubagent={isInSubagent}
                 />
               );
             })}

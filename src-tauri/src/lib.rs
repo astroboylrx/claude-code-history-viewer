@@ -34,7 +34,8 @@ use crate::commands::{
         MetadataState,
     },
     multi_provider::{
-        detect_providers, load_provider_messages, load_provider_sessions, scan_all_projects,
+        detect_providers, get_provider_message_offset, load_provider_messages,
+        load_provider_messages_paginated, load_provider_sessions, scan_all_projects,
         search_all_providers,
     },
     project::{
@@ -217,6 +218,8 @@ fn run_tauri() {
             scan_all_projects,
             load_provider_sessions,
             load_provider_messages,
+            load_provider_messages_paginated,
+            get_provider_message_offset,
             search_all_providers,
             // Archive commands
             get_archive_base_path,

@@ -170,6 +170,14 @@ pub fn build_router(state: Arc<AppState>, host: &str, port: u16, dist_dir: Optio
         .route("/scan_all_projects", post(h::scan_all_projects))
         .route("/load_provider_sessions", post(h::load_provider_sessions))
         .route("/load_provider_messages", post(h::load_provider_messages))
+        .route(
+            "/load_provider_messages_paginated",
+            post(h::load_provider_messages_paginated),
+        )
+        .route(
+            "/get_provider_message_offset",
+            post(h::get_provider_message_offset),
+        )
         .route("/search_all_providers", post(h::search_all_providers))
         // Archive commands
         .route("/get_archive_base_path", post(h::get_archive_base_path))

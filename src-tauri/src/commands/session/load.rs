@@ -1953,6 +1953,107 @@ pub async fn load_session_messages_paginated(
     })
 }
 
+/// Minimal classifier that also captures the message uuid.
+/// Used only by `get_session_message_offset` — keeping it separate from
+/// `LineClassifier` avoids a per-line String allocation on the hot
+/// classification path of the paginated loader.
+#[derive(serde::Deserialize)]
+struct LineUuidClassifier {
+    #[serde(rename = "type")]
+    message_type: String,
+    subtype: Option<String>,
+    #[serde(rename = "isSidechain")]
+    is_sidechain: Option<bool>,
+    #[serde(rename = "isMeta")]
+    is_meta: Option<bool>,
+    uuid: Option<String>,
+}
+
+/// Predicate form of `classify_line_fast` used by `get_session_message_offset`.
+fn is_viewer_visible_line(
+    message_type: &str,
+    subtype: Option<&str>,
+    is_sidechain: Option<bool>,
+    is_meta: Option<bool>,
+    exclude_sidechain: bool,
+) -> bool {
+    if message_type == "summary" {
+        return false;
+    }
+    if is_system_message_type(message_type) {
+        return false;
+    }
+    if message_type == "system" && is_hidden_system_subtype(subtype) {
+        return false;
+    }
+    if is_meta.unwrap_or(false) {
+        return false;
+    }
+    if exclude_sidechain && is_sidechain.unwrap_or(false) {
+        return false;
+    }
+    true
+}
+
+/// Find how far from the NEWEST viewer-visible message a uuid sits.
+/// Returns `Some(0)` for the newest visible message, `Some(n)` when `n`
+/// visible messages are newer than it, and `None` when the uuid is absent.
+/// Loading a chat-style window with `offset = 0, limit = n + 1` therefore
+/// guarantees the message is inside the window.
+///
+/// Iterates newest → oldest so deep links to recent messages exit early.
+#[allow(unsafe_code)] // Required for mmap performance optimization
+pub fn get_session_message_offset(
+    session_path: String,
+    message_uuid: String,
+    exclude_sidechain: Option<bool>,
+) -> Result<Option<usize>, String> {
+    let file =
+        fs::File::open(&session_path).map_err(|e| format!("Failed to open session file: {e}"))?;
+
+    // SAFETY: We're only reading the file, and the file handle is kept open
+    // for the duration of the mmap's lifetime. No concurrent modifications expected
+    // as session files are append-only by Claude.
+    let mmap = unsafe { Mmap::map(&file) }
+        .map_err(|e| format!("Failed to memory-map session file: {e}"))?;
+
+    let exclude = exclude_sidechain.unwrap_or(false);
+    let line_ranges = find_line_ranges(&mmap);
+
+    let mut newer_visible = 0usize;
+    for &(start, end) in line_ranges.iter().rev() {
+        let line = &mmap[start..end];
+        if line
+            .iter()
+            .all(|&b| b == b' ' || b == b'\t' || b == b'\n' || b == b'\r')
+        {
+            continue;
+        }
+
+        let mut line_copy = line.to_vec();
+        let Ok(classifier) = simd_json::serde::from_slice::<LineUuidClassifier>(&mut line_copy)
+        else {
+            continue;
+        };
+        if !is_viewer_visible_line(
+            &classifier.message_type,
+            classifier.subtype.as_deref(),
+            classifier.is_sidechain,
+            classifier.is_meta,
+            exclude,
+        ) {
+            continue;
+        }
+
+        if classifier.uuid.as_deref() == Some(message_uuid.as_str()) {
+            return Ok(Some(newer_visible));
+        }
+        newer_visible += 1;
+    }
+
+    Ok(None)
+}
+
 #[tauri::command]
 #[allow(unsafe_code)] // Required for mmap performance optimization
 pub async fn get_session_message_count(

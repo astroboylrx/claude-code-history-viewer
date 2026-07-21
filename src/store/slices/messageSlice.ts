@@ -14,6 +14,7 @@ import type {
   ProjectStatsSummary,
   SessionComparison,
   SubagentSession,
+  MessagePage,
 } from "../../types";
 import { AppErrorType } from "../../types";
 import type { StateCreator } from "zustand";
@@ -47,6 +48,9 @@ export interface MessageSliceState {
   messages: ClaudeMessage[];
   pagination: PaginationState;
   isLoadingMessages: boolean;
+  messageTotalCount: number;
+  messageHasMore: boolean;
+  isLoadingMoreMessages: boolean;
   isLoadingTokenStats: boolean;
   sessionTokenStats: SessionTokenStats | null;
   sessionConversationTokenStats: SessionTokenStats | null;
@@ -65,6 +69,7 @@ export interface MessageSliceState {
 export interface MessageSliceActions {
   selectSession: (session: ClaudeSession) => Promise<void>;
   refreshCurrentSession: () => Promise<void>;
+  loadMoreMessages: () => Promise<void>;
   loadSessionTokenStats: (sessionPath: string) => Promise<void>;
   loadProjectTokenStats: (projectPath: string) => Promise<void>;
   loadMoreProjectTokenStats: (projectPath: string) => Promise<void>;
@@ -106,6 +111,9 @@ const initialMessageState: MessageSliceState = {
   messages: [],
   pagination: { ...INITIAL_PAGINATION },
   isLoadingMessages: false,
+  messageTotalCount: 0,
+  messageHasMore: false,
+  isLoadingMoreMessages: false,
   isLoadingTokenStats: false,
   sessionTokenStats: null,
   sessionConversationTokenStats: null,
@@ -208,21 +216,21 @@ export const createMessageSlice: StateCreator<
       const start = performance.now();
 
       const provider = session.provider ?? "claude";
-      const allMessages = await api<ClaudeMessage[]>("load_provider_messages", {
+      const PAGE_SIZE = 200;
+      const page = await api<MessagePage>("load_provider_messages_paginated", {
         provider,
         sessionPath,
+        offset: 0,
+        limit: PAGE_SIZE,
       });
 
       // Stale response guard: await 중 다른 세션으로 이동했으면 중단.
-      // (in-place reload는 selectedSession이 동일하므로 여기서 걸리지 않음)
       if (get().selectedSession?.file_path !== session.file_path) return;
 
-      // Apply sidechain filter — shouldTreatAsSubagent(pre-await 캡처값)를 사용.
-      // subagent 세션은 모든 메시지가 isSidechain=true이므로 필터 우회.
       let filteredMessages =
         get().excludeSidechain && !shouldTreatAsSubagent
-          ? allMessages.filter((m) => !m.isSidechain)
-          : allMessages;
+          ? page.messages.filter((m) => !m.isSidechain)
+          : page.messages;
 
       // Apply system message filter
       const systemMessageTypes = [
@@ -239,7 +247,7 @@ export const createMessageSlice: StateCreator<
       const duration = performance.now() - start;
       if (import.meta.env.DEV) {
         console.log(
-          `[Frontend] selectSession: ${filteredMessages.length}개 메시지 로드, ${duration.toFixed(1)}ms`
+          `[Frontend] selectSession: ${filteredMessages.length}/${page.total_count} messages loaded, ${duration.toFixed(1)}ms`
         );
       }
 
@@ -248,17 +256,19 @@ export const createMessageSlice: StateCreator<
         messages: filteredMessages,
         pagination: {
           currentOffset: filteredMessages.length,
-          pageSize: filteredMessages.length,
-          totalCount: filteredMessages.length,
-          hasMore: false,
+          pageSize: PAGE_SIZE,
+          totalCount: page.total_count,
+          hasMore: page.has_more,
           isLoadingMore: false,
         },
+        messageTotalCount: page.total_count,
+        messageHasMore: page.has_more,
+        isLoadingMoreMessages: false,
         isLoadingMessages: false,
       });
 
-      // Load subagent sessions (non-blocking). allMessages는 시스템 메시지 필터 적용 전이므로
-      // progress 메시지를 통한 parentToolUseID ↔ subagent 매핑이 성립.
-      void get().loadSubagents(sessionPath, allMessages);
+      // Load subagent sessions (non-blocking). Pass loaded messages for mapping.
+      void get().loadSubagents(sessionPath, page.messages);
 
       // Build FlexSearch index asynchronously after UI renders
       // The buildSearchIndex now internally uses chunked async processing
@@ -385,6 +395,52 @@ export const createMessageSlice: StateCreator<
       const message = error instanceof Error ? error.message : String(error);
       toast.error(`새로고침 실패: ${message}`);
       get().setError({ type: AppErrorType.UNKNOWN, message: String(error) });
+    }
+  },
+
+  loadMoreMessages: async () => {
+    const state = get();
+    const session = state.selectedSession;
+    if (!session || state.isLoadingMoreMessages || !state.messageHasMore) return;
+
+    set({ isLoadingMoreMessages: true });
+
+    try {
+      const provider = session.provider ?? "claude";
+      const offset = state.messages.length;
+
+      const page = await api<MessagePage>("load_provider_messages_paginated", {
+        provider,
+        sessionPath: session.file_path,
+        offset,
+        limit: 200,
+      });
+
+      // Stale guard
+      if (get().selectedSession?.file_path !== session.file_path) return;
+
+      let newMessages = state.excludeSidechain
+        ? page.messages.filter((m) => !m.isSidechain)
+        : page.messages;
+
+      const systemMessageTypes = ["queue-operation", "progress", "file-history-snapshot"];
+      if (!get().showSystemMessages) {
+        newMessages = newMessages.filter((m) => !systemMessageTypes.includes(m.type));
+      }
+
+      // Prepend older messages
+      set({
+        messages: [...newMessages, ...get().messages],
+        messageHasMore: page.has_more,
+        messageTotalCount: page.total_count,
+        isLoadingMoreMessages: false,
+      });
+
+      // Add to search index
+      buildSearchIndex(newMessages);
+    } catch (error) {
+      console.error("Failed to load more messages:", error);
+      set({ isLoadingMoreMessages: false });
     }
   },
 
