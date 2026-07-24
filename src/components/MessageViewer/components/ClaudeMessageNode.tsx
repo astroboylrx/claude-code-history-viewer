@@ -62,6 +62,7 @@ export const ClaudeMessageNode = React.memo(({
   const messageFilter = useAppStore((s) => s.messageFilter);
   const subagentSessions = useAppStore((s) => s.subagentSessions);
   const navigateToSubagent = useAppStore((s) => s.navigateToSubagent);
+  const isInSubagent = useAppStore((s) => s.parentSessionStack.length > 0);
 
   const handleViewSubagent = subagentSessions.length > 0
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -122,7 +123,7 @@ export const ClaudeMessageNode = React.memo(({
     </button>
   ) : null;
 
-  if (message.isSidechain) {
+  if (message.isSidechain && !isInSubagent) {
     return null;
   }
 

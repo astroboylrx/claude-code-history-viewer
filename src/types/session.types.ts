@@ -74,6 +74,7 @@ export interface SubagentSession {
   first_message_time: string | null;
   last_message_time: string | null;
   summary: string | null;
+  tool_use_id: string | null;
 }
 
 // ============================================================================

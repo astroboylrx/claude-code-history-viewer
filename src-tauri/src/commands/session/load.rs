@@ -1670,6 +1670,7 @@ pub struct SubagentSession {
     pub first_message_time: Option<String>,
     pub last_message_time: Option<String>,
     pub summary: Option<String>,
+    pub tool_use_id: Option<String>,
 }
 
 /// Returns subagent sessions for a given parent session file.
@@ -1710,6 +1711,9 @@ pub async fn get_session_subagents(session_path: String) -> Result<Vec<SubagentS
         // Quick scan: first and last lines + line count
         let (message_count, first_time, last_time, summary) = extract_subagent_metadata(&sa_path);
 
+        let meta_path = sa_path.with_file_name(format!("{file_name}.meta.json"));
+        let tool_use_id = read_subagent_tool_use_id(&meta_path);
+
         sessions.push(SubagentSession {
             agent_id,
             file_path: sa_path.to_string_lossy().to_string(),
@@ -1718,6 +1722,7 @@ pub async fn get_session_subagents(session_path: String) -> Result<Vec<SubagentS
             first_message_time: first_time,
             last_message_time: last_time,
             summary,
+            tool_use_id,
         });
     }
 
@@ -1725,6 +1730,23 @@ pub async fn get_session_subagents(session_path: String) -> Result<Vec<SubagentS
     sessions.sort_by(|a, b| a.first_message_time.cmp(&b.first_message_time));
 
     Ok(sessions)
+}
+
+fn read_subagent_tool_use_id(meta_path: &std::path::Path) -> Option<String> {
+    let meta = std::fs::symlink_metadata(meta_path).ok()?;
+    if meta.file_type().is_symlink() {
+        return None;
+    }
+    let content = std::fs::read_to_string(meta_path).ok()?;
+
+    #[derive(serde::Deserialize)]
+    struct SubagentMeta {
+        #[serde(rename = "toolUseId")]
+        tool_use_id: Option<String>,
+    }
+
+    let parsed: SubagentMeta = serde_json::from_str(&content).ok()?;
+    parsed.tool_use_id.filter(|s| !s.is_empty())
 }
 
 /// Metadata extraction from a subagent JSONL file.

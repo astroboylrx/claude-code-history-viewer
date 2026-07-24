@@ -779,17 +779,23 @@ export const createMessageSlice: StateCreator<
       });
       // Guard: only update if still viewing the same session
       if (get().selectedSession?.file_path === sessionPath) {
-        // progress 메시지만 parentToolUseID와 agentId를 함께 보유 → 유일한 매핑 소스.
-        // Map 값은 file_path(유일 식별자) — agent_id는 filename stem 기반이라 충돌 가능.
-        // sourceMessages는 반드시 pre-filter(allMessages) — post-filter는 progress 제거됨.
         let map: Map<string, string> | ReadonlyMap<string, string> =
           EMPTY_SUBAGENT_MAP;
         if (subagents.length > 0) {
-          // O(1) lookup을 위해 agent_id → subagent 인덱스 선구축
-          const byAgentId = new Map(subagents.map((s) => [s.agent_id, s]));
           const built = new Map<string, string>();
+
+          // Primary: meta.json toolUseId (authoritative for newer sessions)
+          for (const sub of subagents) {
+            if (sub.tool_use_id) {
+              built.set(sub.tool_use_id, sub.file_path);
+            }
+          }
+
+          // Fallback: progress messages for older sessions without meta.json
+          const byAgentId = new Map(subagents.map((s) => [s.agent_id, s]));
           for (const msg of sourceMessages) {
             if (msg.type !== "progress" || !msg.parentToolUseID) continue;
+            if (built.has(msg.parentToolUseID)) continue;
             const agentId = getAgentIdFromProgress(msg);
             if (!agentId) continue;
             const sub = byAgentId.get(agentId);
@@ -797,6 +803,7 @@ export const createMessageSlice: StateCreator<
               built.set(msg.parentToolUseID, sub.file_path);
             }
           }
+
           if (built.size > 0) map = built;
         }
         set({
