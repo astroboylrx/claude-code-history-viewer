@@ -242,16 +242,26 @@ pub fn detect_providers() -> Vec<ProviderInfo> {
     if let Some(info) = qwen::detect() {
         providers.push(info);
     }
-    if let Some(info) = zed::detect() {
-        providers.push(info);
-    }
-    if let Some(info) = trae::detect() {
-        providers.push(info);
+    // On macOS, providers that access ~/Library/Application Support/ for other
+    // apps (VS Code, Cursor, Zed, Trae, Copilot) trigger TCC "data from other
+    // apps" prompts. Skip them during auto-detection — they can be added
+    // manually via custom directory settings if needed.
+    #[cfg(not(target_os = "macos"))]
+    {
+        if let Some(info) = zed::detect() {
+            providers.push(info);
+        }
+        if let Some(info) = trae::detect() {
+            providers.push(info);
+        }
+        if let Some(info) = cursor::detect() {
+            providers.push(info);
+        }
+        if let Some(info) = copilot::detect() {
+            providers.push(info);
+        }
     }
     if let Some(info) = cline::detect() {
-        providers.push(info);
-    }
-    if let Some(info) = cursor::detect() {
         providers.push(info);
     }
     if let Some(info) = cursor_agent::detect() {
@@ -276,9 +286,6 @@ pub fn detect_providers() -> Vec<ProviderInfo> {
         providers.push(info);
     }
     if let Some(info) = llm::detect() {
-        providers.push(info);
-    }
-    if let Some(info) = copilot::detect() {
         providers.push(info);
     }
     if let Some(info) = vibe::detect() {
