@@ -268,7 +268,19 @@ fn extract_cwd_from_project_dir(project_dir: &str) -> Option<String> {
 /// 3. Check `/Users/jack/client` (exists? continue)
 /// 4. Check `/Users/jack/client/claude-code-history-viewer` (exists? ✓ return this)
 pub fn decode_with_filesystem_check(encoded: &str) -> Option<String> {
-    decode_recursive(encoded, "")
+    // On macOS, symlink_metadata on decoded paths under TCC-protected
+    // directories (Desktop, Documents, Downloads) triggers permission
+    // prompts. Skip the filesystem check and fall through to heuristic.
+    #[cfg(target_os = "macos")]
+    {
+        let _ = encoded;
+        return None;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        decode_recursive(encoded, "")
+    }
 }
 
 /// Recursively decode hyphen-separated path segments by checking filesystem existence.
