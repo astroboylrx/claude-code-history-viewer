@@ -6,7 +6,7 @@
 
 **[jhlee0409/claude-code-history-viewer](https://github.com/jhlee0409/claude-code-history-viewer) 포크** — 추가 기능 및 Linux 수정 포함.
 
-**Claude Code**, **Codex CLI**, **OpenCode**, **Kimi CLI** 등의 대화 기록을 탐색, 검색, 분석 — 100% 오프라인.
+**Claude Code**, **Codex CLI**, **OpenCode**, **Kimi** (Kimi Code / Kimi CLI) 등의 대화 기록을 탐색, 검색, 분석 — 100% 오프라인.
 
 </div>
 
@@ -19,7 +19,7 @@
 ## 추가 기능
 
 - **OpenCode 디렉토리 기반 그룹화** — 단일 "global" 프로젝트 대신 작업 트리별로 세션 그룹화
-- **Kimi CLI 지원** — 세션 탐색, 검색, 토큰 통계를 갖춘 완전한 프로바이더
+- **Kimi 지원 (Kimi Code & Kimi CLI)** — 세션 탐색, 검색, 토큰 통계를 갖춘 완전한 프로바이더. 배지는 "Kimi (Code)" 또는 "Kimi (CLI)"로 표시
 - **통일된 프로젝트 이름** — 모든 프로바이더가 `~/path/to/project` 형식으로 표시
 - **프로젝트별 모델 분포** — 개별 프로젝트 통계 페이지의 모델 사용 분석 카드
 - **글로벌 통계: 클릭 가능한 인기 프로젝트** — 인기 프로젝트 카드에서 프로젝트를 클릭하여 탐색
@@ -94,6 +94,10 @@ cp -r "src-tauri/target/release/bundle/macos/Claude Code History Viewer.app" "/A
 cd ..
 rm -rf claude-code-history-viewer
 ```
+
+## 참고 사항
+
+**macOS 개인정보 알림:** 처음 실행 시 macOS에서 '다른 앱의 데이터에 접근' 권한 알림이 표시될 수 있습니다. 이는 정상적인 동작입니다 — 시스템에 설치된 AI 코딩 도구의 세션 기록을 읽기 때문입니다. 모든 제공자를 활성화하려면 '허용'을 클릭하세요. 알림은 한 번만 표시됩니다.
 
 ## 업스트림
 

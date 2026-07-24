@@ -6,7 +6,7 @@
 
 **Fork of [jhlee0409/claude-code-history-viewer](https://github.com/jhlee0409/claude-code-history-viewer)** with extra features and Linux fixes.
 
-Browse, search, and analyze conversations from **Claude Code**, **Codex CLI**, **OpenCode**, **Kimi CLI**, and more — 100% offline.
+Browse, search, and analyze conversations from **Claude Code**, **Codex CLI**, **OpenCode**, **Kimi** (Kimi Code / Kimi CLI), and more — 100% offline.
 
 </div>
 
@@ -19,7 +19,7 @@ Browse, search, and analyze conversations from **Claude Code**, **Codex CLI**, *
 ## Added Features
 
 - **OpenCode directory-based grouping** — sessions grouped by worktree instead of a single "global" project
-- **Kimi CLI support** — full provider with session browsing, search, and token stats
+- **Kimi support (Kimi Code & Kimi CLI)** — full provider with session browsing, search, and token stats. Badge shows "Kimi (Code)" or "Kimi (CLI)"
 - **Consistent project names** — all providers show `~/path/to/project` format
 - **Per-project model distribution** — model usage breakdown card on individual project stats
 - **Global stats: clickable top projects** — click a project in the Top Projects card to navigate to it
@@ -94,6 +94,10 @@ You can now safely delete the downloaded source code folder to free up space:
 cd ..
 rm -rf claude-code-history-viewer
 ```
+
+## Notes
+
+**macOS Privacy Prompt:** On first launch, macOS may show a "data from other apps" permission prompt. This is expected — the app reads session history from AI coding tools installed on your system. Click "Allow" to enable all providers. The prompt only appears once.
 
 ## Upstream
 

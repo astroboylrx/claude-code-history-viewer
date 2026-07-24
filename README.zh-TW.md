@@ -6,7 +6,7 @@
 
 **[jhlee0409/claude-code-history-viewer](https://github.com/jhlee0409/claude-code-history-viewer) 的分支**，包含額外功能和 Linux 修復。
 
-瀏覽、搜尋和分析來自 **Claude Code**、**Codex CLI**、**OpenCode**、**Kimi CLI** 等的對話記錄 — 100% 離線。
+瀏覽、搜尋和分析來自 **Claude Code**、**Codex CLI**、**OpenCode**、**Kimi**（Kimi Code / Kimi CLI）等的對話記錄 — 100% 離線。
 
 </div>
 
@@ -19,7 +19,7 @@
 ## 新增功能
 
 - **OpenCode 按目錄分組** — 工作階段按工作樹分組，而非單一的「global」專案
-- **Kimi CLI 支援** — 完整的提供者，支援工作階段瀏覽、搜尋和 Token 統計
+- **Kimi 支援 (Kimi Code & Kimi CLI)** — 完整的提供者，支援工作階段瀏覽、搜尋和 Token 統計。徽章顯示「Kimi (Code)」或「Kimi (CLI)」
 - **一致的專案名稱** — 所有提供者顯示 `~/path/to/project` 格式
 - **按專案的模型分佈** — 單一專案統計頁面中的模型使用分析卡片
 - **全域統計：可點擊的熱門專案** — 點擊熱門專案卡片中的專案即可導航到該專案
@@ -94,6 +94,10 @@ cp -r "src-tauri/target/release/bundle/macos/Claude Code History Viewer.app" "/A
 cd ..
 rm -rf claude-code-history-viewer
 ```
+
+## 注意事項
+
+**macOS 隱私提示：** 首次啟動時，macOS 可能會顯示「存取其他 App 的資料」權限提示。這是正常的——應用需要讀取系統上安裝的 AI 程式設計工具的工作階段歷史記錄。點擊「允許」以啟用所有提供者。該提示只會出現一次。
 
 ## 上游專案
 

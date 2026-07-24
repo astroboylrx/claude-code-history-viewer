@@ -6,7 +6,7 @@
 
 **[jhlee0409/claude-code-history-viewer](https://github.com/jhlee0409/claude-code-history-viewer) のフォーク** — 追加機能と Linux 修正を含みます。
 
-**Claude Code**、**Codex CLI**、**OpenCode**、**Kimi CLI** などからの会話を閲覧、検索、分析 — 100% オフライン。
+**Claude Code**、**Codex CLI**、**OpenCode**、**Kimi** (Kimi Code / Kimi CLI) などからの会話を閲覧、検索、分析 — 100% オフライン。
 
 </div>
 
@@ -19,7 +19,7 @@
 ## 追加機能
 
 - **OpenCode ディレクトリベースのグループ化** — 単一の「global」プロジェクトではなく、ワークツリーごとにセッションをグループ化
-- **Kimi CLI サポート** — セッション閲覧、検索、トークン統計を備えた完全なプロバイダー
+- **Kimi サポート (Kimi Code & Kimi CLI)** — セッション閲覧、検索、トークン統計を備えた完全なプロバイダー。バッジは「Kimi (Code)」または「Kimi (CLI)」と表示
 - **統一されたプロジェクト名** — すべてのプロバイダーが `~/path/to/project` 形式で表示
 - **プロジェクト別モデル分布** — 個別プロジェクト統計ページのモデル使用分析カード
 - **グローバル統計：クリック可能なトッププロジェクト** — トッププロジェクトカードのプロジェクトをクリックしてナビゲーション
@@ -94,6 +94,10 @@ cp -r "src-tauri/target/release/bundle/macos/Claude Code History Viewer.app" "/A
 cd ..
 rm -rf claude-code-history-viewer
 ```
+
+## 注意事項
+
+**macOSプライバシープロンプト:** 初回起動時、macOSが「他のAppのデータへのアクセス」権限プロンプトを表示する場合があります。これは正常な動作です — システムにインストールされたAIコーディングツールのセッション履歴を読み取るためです。すべてのプロバイダを有効にするには「許可」をクリックしてください。プロンプトは一度だけ表示されます。
 
 ## アップストリーム
 
