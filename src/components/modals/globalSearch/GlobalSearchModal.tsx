@@ -47,6 +47,7 @@ export const GlobalSearchModal = ({
     const inputRef = useRef<HTMLInputElement>(null);
     const resultsContainerRef = useRef<HTMLDivElement>(null);
     const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const resolveTokenRef = useRef(0);
 
     const { claudePath, projects, selectProject, selectSession, sessions, getSessionDisplayName, activeProviders, navigateToMessage, clearTargetMessage, userMetadata } =
         useAppStore();
@@ -159,7 +160,7 @@ export const GlobalSearchModal = ({
     const handleSelectResult = useCallback(
         async (result: GlobalSearchResult) => {
             try {
-                let targetSession = sessions.find(
+                const targetSession = sessions.find(
                     (s) =>
                         s.session_id === result.sessionId ||
                         s.actual_session_id === result.sessionId,
@@ -172,39 +173,65 @@ export const GlobalSearchModal = ({
                     return;
                 }
 
-                for (const project of projects) {
+                const token = ++resolveTokenRef.current;
+                const resultProvider = result.provider ?? "claude";
+                const rank = (project: (typeof projects)[number]): number => {
+                    const projectProvider = project.provider ?? "claude";
+                    if (projectProvider !== resultProvider) return 3;
+                    if (result.projectName && project.name === result.projectName) return 0;
+                    if (
+                        result.projectName &&
+                        (project.name.includes(result.projectName) ||
+                            project.actual_path?.endsWith(result.projectName))
+                    ) return 1;
+                    return 2;
+                };
+                const candidates = [...projects].sort((a, b) => rank(a) - rank(b));
+
+                const { excludeSidechain } = useAppStore.getState();
+                const findInProject = async (
+                    project: (typeof projects)[number],
+                ): Promise<{ project: typeof project; session: ClaudeSession } | null> => {
                     try {
                         const projectProvider = project.provider ?? "claude";
-                        const { excludeSidechain } = useAppStore.getState();
                         const projectSessions = await api<ClaudeSession[]>(
                             projectProvider !== "claude" ? "load_provider_sessions" : "load_project_sessions",
                             projectProvider !== "claude"
                                 ? { provider: projectProvider, projectPath: project.path, excludeSidechain }
                                 : { projectPath: project.path, excludeSidechain },
                         );
-
-                        targetSession = projectSessions.find(
+                        const session = projectSessions.find(
                             (s) =>
                                 s.session_id === result.sessionId ||
                                 s.actual_session_id === result.sessionId,
                         );
-
-                        if (targetSession) {
-                            if (result.uuid) navigateToMessage(result.uuid);
-                            await selectProject(project);
-                            await selectSession(targetSession);
-                            onClose();
-                            return;
-                        }
+                        return session ? { project, session } : null;
                     } catch (error) {
                         console.error(
                             `Failed to load sessions for project ${project.name}:`,
                             error,
                         );
+                        return null;
+                    }
+                };
+
+                const BATCH_SIZE = 4;
+                for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+                    if (token !== resolveTokenRef.current) return;
+                    const batch = candidates.slice(i, i + BATCH_SIZE);
+                    const found = (await Promise.all(batch.map(findInProject))).find(
+                        (hit): hit is NonNullable<typeof hit> => hit !== null,
+                    );
+                    if (token !== resolveTokenRef.current) return;
+                    if (found) {
+                        if (result.uuid) navigateToMessage(result.uuid);
+                        await selectProject(found.project);
+                        await selectSession(found.session);
+                        onClose();
+                        return;
                     }
                 }
 
-                // Session not found in any project
                 clearTargetMessage();
                 toast.error(t("globalSearch.sessionNotFound"));
                 onClose();
@@ -266,6 +293,7 @@ export const GlobalSearchModal = ({
         if (isOpen) {
             setTimeout(() => inputRef.current?.focus(), 0);
         } else {
+            resolveTokenRef.current++;
             setQuery("");
             setResults([]);
             setSelectedIndex(0);
