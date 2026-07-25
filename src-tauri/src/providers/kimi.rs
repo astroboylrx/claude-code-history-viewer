@@ -673,8 +673,9 @@ fn load_messages_v2(wire_path: &Path) -> Result<Vec<ClaudeMessage>, String> {
             }
         });
 
-    let mut messages = Vec::new();
+    let mut messages: Vec<ClaudeMessage> = Vec::new();
     let mut counter = 0u64;
+    let mut kimi_model: Option<String> = None;
 
     for line in data.lines() {
         let trimmed = line.trim();
@@ -687,6 +688,69 @@ fn load_messages_v2(wire_path: &Path) -> Result<Vec<ClaudeMessage>, String> {
         };
 
         let line_type = raw.get("type").and_then(Value::as_str).unwrap_or("");
+
+        // Capture model name from llm.request events
+        if line_type == "llm.request" {
+            if let Some(alias) = raw.get("modelAlias").and_then(Value::as_str) {
+                kimi_model = Some(alias.to_string());
+            }
+        }
+
+        // Capture usage from usage.record events and apply to last assistant message
+        if line_type == "usage.record" {
+            if let Some(usage) = raw.get("usage") {
+                let input = usage.get("inputOther").and_then(Value::as_u64).unwrap_or(0) as u32;
+                let output = usage.get("output").and_then(Value::as_u64).unwrap_or(0) as u32;
+                let cache_read = usage.get("inputCacheRead").and_then(Value::as_u64).unwrap_or(0) as u32;
+                let cache_create = usage.get("inputCacheCreation").and_then(Value::as_u64).unwrap_or(0) as u32;
+                if input > 0 || output > 0 {
+                    // Apply to the most recent assistant message without usage
+                    for msg in messages.iter_mut().rev() {
+                        if msg.role.as_deref() == Some("assistant") && msg.usage.is_none() {
+                            msg.usage = Some(TokenUsage {
+                                input_tokens: Some(input),
+                                output_tokens: Some(output),
+                                cache_creation_input_tokens: if cache_create > 0 { Some(cache_create) } else { None },
+                                cache_read_input_tokens: if cache_read > 0 { Some(cache_read) } else { None },
+                                service_tier: None,
+                            });
+                            break;
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+
+        // Also handle context.append_loop_event with step.end for usage
+        if line_type == "context.append_loop_event" {
+            if let Some(event) = raw.get("event") {
+                if event.get("type").and_then(Value::as_str) == Some("step.end") {
+                    if let Some(usage) = event.get("usage") {
+                        let input = usage.get("inputOther").and_then(Value::as_u64).unwrap_or(0) as u32;
+                        let output = usage.get("output").and_then(Value::as_u64).unwrap_or(0) as u32;
+                        let cache_read = usage.get("inputCacheRead").and_then(Value::as_u64).unwrap_or(0) as u32;
+                        let cache_create = usage.get("inputCacheCreation").and_then(Value::as_u64).unwrap_or(0) as u32;
+                        if input > 0 || output > 0 {
+                            for msg in messages.iter_mut().rev() {
+                                if msg.role.as_deref() == Some("assistant") && msg.usage.is_none() {
+                                    msg.usage = Some(TokenUsage {
+                                        input_tokens: Some(input),
+                                        output_tokens: Some(output),
+                                        cache_creation_input_tokens: if cache_create > 0 { Some(cache_create) } else { None },
+                                        cache_read_input_tokens: if cache_read > 0 { Some(cache_read) } else { None },
+                                        service_tier: None,
+                                    });
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+
         if line_type != "context.append_message" {
             continue;
         }
@@ -828,9 +892,10 @@ fn load_messages_v2(wire_path: &Path) -> Result<Vec<ClaudeMessage>, String> {
         }
     }
 
+    let model_name = kimi_model.as_deref().unwrap_or("kimi-for-coding");
     for msg in &mut messages {
         if msg.role.as_deref() == Some("assistant") && msg.model.is_none() {
-            msg.model = Some("kimi-for-coding".to_string());
+            msg.model = Some(model_name.to_string());
         }
     }
 
