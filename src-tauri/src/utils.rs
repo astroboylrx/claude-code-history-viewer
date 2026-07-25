@@ -383,6 +383,16 @@ fn extract_main_git_dir(gitdir: &str) -> Option<String> {
 /// [`Linked`]: GitWorktreeType::Linked
 /// [`NotGit`]: GitWorktreeType::NotGit
 pub fn detect_git_worktree_info(project_path: &str) -> Option<GitInfo> {
+    // On macOS, checking .git existence on decoded project paths can trigger
+    // TCC prompts (Desktop, Documents, Downloads, Music, Photos). Skip it.
+    #[cfg(target_os = "macos")]
+    {
+        let _ = project_path;
+        return None;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
     let actual_path = decode_project_path(project_path);
     let git_path = Path::new(&actual_path).join(".git");
 
@@ -428,6 +438,7 @@ pub fn detect_git_worktree_info(project_path: &str) -> Option<GitInfo> {
         worktree_type: GitWorktreeType::NotGit,
         main_project_path: None,
     })
+    }
 }
 
 /// Check if a path is a symlink (without following it)
