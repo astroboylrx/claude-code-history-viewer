@@ -8,9 +8,5 @@
     <string>Claude Code History Viewer reads AI assistant session files that may be stored in your Documents folder.</string>
     <key>NSDownloadsFolderUsageDescription</key>
     <string>Claude Code History Viewer reads AI assistant session files that may be stored in your Downloads folder.</string>
-    <key>NSAppleMusicUsageDescription</key>
-    <string>Claude Code History Viewer does not access your Music library.</string>
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>Claude Code History Viewer does not access your Photos library.</string>
 </dict>
 </plist>
