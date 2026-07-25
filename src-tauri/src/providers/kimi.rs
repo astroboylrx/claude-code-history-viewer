@@ -696,29 +696,8 @@ fn load_messages_v2(wire_path: &Path) -> Result<Vec<ClaudeMessage>, String> {
             }
         }
 
-        // Capture usage from usage.record events and apply to last assistant message
+        // usage.record duplicates step.end data — skip to avoid double counting
         if line_type == "usage.record" {
-            if let Some(usage) = raw.get("usage") {
-                let input = usage.get("inputOther").and_then(Value::as_u64).unwrap_or(0) as u32;
-                let output = usage.get("output").and_then(Value::as_u64).unwrap_or(0) as u32;
-                let cache_read = usage.get("inputCacheRead").and_then(Value::as_u64).unwrap_or(0) as u32;
-                let cache_create = usage.get("inputCacheCreation").and_then(Value::as_u64).unwrap_or(0) as u32;
-                if input > 0 || output > 0 {
-                    // Apply to the most recent assistant message without usage
-                    for msg in messages.iter_mut().rev() {
-                        if msg.role.as_deref() == Some("assistant") && msg.usage.is_none() {
-                            msg.usage = Some(TokenUsage {
-                                input_tokens: Some(input),
-                                output_tokens: Some(output),
-                                cache_creation_input_tokens: if cache_create > 0 { Some(cache_create) } else { None },
-                                cache_read_input_tokens: if cache_read > 0 { Some(cache_read) } else { None },
-                                service_tier: None,
-                            });
-                            break;
-                        }
-                    }
-                }
-            }
             continue;
         }
 
