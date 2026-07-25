@@ -723,9 +723,13 @@ fn load_messages_v2(wire_path: &Path) -> Result<Vec<ClaudeMessage>, String> {
         }
 
         // Also handle context.append_loop_event with step.end for usage
+        // AND content.part for assistant messages (newer Kimi Code format)
         if line_type == "context.append_loop_event" {
             if let Some(event) = raw.get("event") {
-                if event.get("type").and_then(Value::as_str) == Some("step.end") {
+                let evt_type = event.get("type").and_then(Value::as_str).unwrap_or("");
+
+                // step.end → extract usage and apply to last assistant message
+                if evt_type == "step.end" {
                     if let Some(usage) = event.get("usage") {
                         let input = usage.get("inputOther").and_then(Value::as_u64).unwrap_or(0) as u32;
                         let output = usage.get("output").and_then(Value::as_u64).unwrap_or(0) as u32;
@@ -747,54 +751,44 @@ fn load_messages_v2(wire_path: &Path) -> Result<Vec<ClaudeMessage>, String> {
                         }
                     }
                 }
-            }
-            continue;
-        }
 
-        // Parse assistant content from content.part events (newer Kimi Code format)
-        if line_type == "context.append_loop_event" {
-            let event = match raw.get("event") {
-                Some(e) => e,
-                None => continue,
-            };
-            if event.get("type").and_then(Value::as_str) != Some("content.part") {
-                continue;
-            }
-            let part = match event.get("part") {
-                Some(p) => p,
-                None => continue,
-            };
-            let part_type = part.get("type").and_then(Value::as_str).unwrap_or("");
-            let ts = base_timestamp
-                .map(|t| timestamp_to_rfc3339(Some(t as f64)))
-                .unwrap_or_else(|| Utc::now().to_rfc3339());
+                // content.part → create assistant message
+                if evt_type == "content.part" {
+                    if let Some(part) = event.get("part") {
+                        let part_type = part.get("type").and_then(Value::as_str).unwrap_or("");
+                        let ts = base_timestamp
+                            .map(|t| timestamp_to_rfc3339(Some(t as f64)))
+                            .unwrap_or_else(|| Utc::now().to_rfc3339());
 
-            match part_type {
-                "think" => {
-                    let think = part.get("think").and_then(Value::as_str).unwrap_or("");
-                    if !think.is_empty() {
-                        counter += 1;
-                        let uuid = format!("kimi-{counter}");
-                        let content = serde_json::json!([{"type": "thinking", "thinking": think}]);
-                        messages.push(build_provider_message(
-                            "kimi", uuid, &session_id, ts, "assistant",
-                            Some("assistant"), Some(content), None,
-                        ));
+                        match part_type {
+                            "think" => {
+                                let think = part.get("think").and_then(Value::as_str).unwrap_or("");
+                                if !think.is_empty() {
+                                    counter += 1;
+                                    let uuid = format!("kimi-{counter}");
+                                    let content = serde_json::json!([{"type": "thinking", "thinking": think}]);
+                                    messages.push(build_provider_message(
+                                        "kimi", uuid, &session_id, ts, "assistant",
+                                        Some("assistant"), Some(content), None,
+                                    ));
+                                }
+                            }
+                            "text" => {
+                                let text = part.get("text").and_then(Value::as_str).unwrap_or("");
+                                if !text.is_empty() {
+                                    counter += 1;
+                                    let uuid = format!("kimi-{counter}");
+                                    let content = serde_json::json!([{"type": "text", "text": text}]);
+                                    messages.push(build_provider_message(
+                                        "kimi", uuid, &session_id, ts, "assistant",
+                                        Some("assistant"), Some(content), None,
+                                    ));
+                                }
+                            }
+                            _ => {}
+                        }
                     }
                 }
-                "text" => {
-                    let text = part.get("text").and_then(Value::as_str).unwrap_or("");
-                    if !text.is_empty() {
-                        counter += 1;
-                        let uuid = format!("kimi-{counter}");
-                        let content = serde_json::json!([{"type": "text", "text": text}]);
-                        messages.push(build_provider_message(
-                            "kimi", uuid, &session_id, ts, "assistant",
-                            Some("assistant"), Some(content), None,
-                        ));
-                    }
-                }
-                _ => {}
             }
             continue;
         }
