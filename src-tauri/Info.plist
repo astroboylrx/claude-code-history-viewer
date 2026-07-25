@@ -2,11 +2,5 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>NSDesktopFolderUsageDescription</key>
-    <string>Claude Code History Viewer reads session history files that may be stored on your Desktop.</string>
-    <key>NSDocumentsFolderUsageDescription</key>
-    <string>Claude Code History Viewer reads AI assistant session files that may be stored in your Documents folder.</string>
-    <key>NSDownloadsFolderUsageDescription</key>
-    <string>Claude Code History Viewer reads AI assistant session files that may be stored in your Downloads folder.</string>
 </dict>
 </plist>
