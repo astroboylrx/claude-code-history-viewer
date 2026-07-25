@@ -162,6 +162,7 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
     // 메시지 로딩 상태 — 로딩 스피너 표시 조건
     isLoadingMessages,
     messageHasMore,
+    messageTotalCount,
     isLoadingMoreMessages,
     loadMoreMessages,
   } = useAppStore();
@@ -973,7 +974,7 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
 
       {/* Filter Toolbar */}
       {!isCaptureMode && messages.length > 0 && (
-        <FilterToolbar totalCount={messages.length} filteredCount={displayMessages.length} />
+        <FilterToolbar totalCount={messageTotalCount || messages.length} filteredCount={displayMessages.length} />
       )}
 
       {/* Capture Mode Toolbar */}
@@ -1089,7 +1090,7 @@ export const MessageViewer: React.FC<MessageViewerProps> = ({
           >
             <div className="text-sm text-muted-foreground">
               {t("messageViewer.allMessagesLoaded", {
-                count: messages.length,
+                count: messageTotalCount || messages.length,
               })}
             </div>
           </div>
