@@ -834,6 +834,44 @@ fn load_messages_v2(wire_path: &Path) -> Result<Vec<ClaudeMessage>, String> {
         }
     }
 
+    // Try to recover token data from old format if this session was migrated
+    let session_dir = wire_path.parent()
+        .and_then(|p| p.parent())
+        .and_then(|p| p.parent());
+    if let Some(dir) = session_dir {
+        let total_tokens = read_tokens_from_migrated_session(dir);
+        if total_tokens > 0 {
+            let assistant_indices: Vec<usize> = messages.iter().enumerate()
+                .filter(|(_, m)| m.role.as_deref() == Some("assistant"))
+                .map(|(i, _)| i)
+                .collect();
+            if !assistant_indices.is_empty() {
+                let per_turn = total_tokens / assistant_indices.len() as u64;
+                if per_turn > 0 {
+                    for &idx in &assistant_indices {
+                        if let Some(msg) = messages.get_mut(idx) {
+                            if msg.usage.is_none() {
+                                msg.usage = Some(TokenUsage {
+                                    input_tokens: Some(per_turn as u32),
+                                    output_tokens: Some(0),
+                                    cache_creation_input_tokens: None,
+                                    cache_read_input_tokens: None,
+                                    service_tier: None,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for msg in &mut messages {
+        if msg.role.as_deref() == Some("assistant") && msg.model.is_none() {
+            msg.model = Some("kimi-for-coding".to_string());
+        }
+    }
+
     Ok(messages)
 }
 
@@ -1135,6 +1173,28 @@ fn get_project_name_from_state_v1(session_dir: &Path) -> Option<String> {
         }
     }
     None
+}
+
+fn read_tokens_from_migrated_session(session_dir: &Path) -> u64 {
+    let state_path = session_dir.join("state.json");
+    let content = match std::fs::read_to_string(&state_path) {
+        Ok(c) => c,
+        Err(_) => return 0,
+    };
+    let val: Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return 0,
+    };
+    let source_path = match val
+        .get("custom")
+        .and_then(|c| c.get("kimi_cli_source_path"))
+        .and_then(Value::as_str)
+    {
+        Some(p) => p,
+        None => return 0,
+    };
+    let old_dir = Path::new(source_path);
+    read_total_tokens_v1(old_dir)
 }
 
 fn read_total_tokens_v1(session_dir: &Path) -> u64 {
