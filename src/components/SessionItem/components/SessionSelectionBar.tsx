@@ -1,13 +1,24 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { CheckCheck, Copy, Trash2, X } from "lucide-react";
+import {
+  CheckCheck,
+  Copy,
+  TerminalSquare as SquareTerminal,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { usePlatform } from "@/contexts/platform";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/useAppStore";
-import { supportsSessionDeletion } from "@/utils/providers";
+import {
+  supportsResumeCommandForSession,
+  supportsSessionDeletion,
+} from "@/utils/providers";
 import type { ClaudeSession } from "@/types";
 import { useSessionBatchActions } from "../hooks/useSessionBatchActions";
 import { SessionMultiDeleteDialog } from "./SessionMultiDeleteDialog";
+import { SessionMultiResumeDialog } from "./SessionMultiResumeDialog";
 
 interface SessionSelectionBarProps {
   /** All sessions loaded for the project (used to resolve selected IDs). */
@@ -26,15 +37,19 @@ export const SessionSelectionBar: React.FC<SessionSelectionBarProps> = ({
   visibleSessions,
 }) => {
   const { t } = useTranslation();
+  const { isDesktop } = usePlatform();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false);
 
   const sessionSelectionIds = useAppStore((s) => s.sessionSelectionIds);
+  const selectedProject = useAppStore((s) => s.selectedProject);
   const setSessionSelectionIds = useAppStore((s) => s.setSessionSelectionIds);
   const clearSessionSelection = useAppStore((s) => s.clearSessionSelection);
   const exitSessionSelectionMode = useAppStore((s) => s.exitSessionSelectionMode);
   const getSessionDisplayName = useAppStore((s) => s.getSessionDisplayName);
 
-  const { isDeleting, deleteSessions, copyIds } = useSessionBatchActions();
+  const { isDeleting, isResuming, deleteSessions, resumeSessions, copyIds } =
+    useSessionBatchActions();
 
   const idSet = useMemo(() => new Set(sessionSelectionIds), [sessionSelectionIds]);
 
@@ -46,25 +61,40 @@ export const SessionSelectionBar: React.FC<SessionSelectionBarProps> = ({
     () => selectedSessions.filter((s) => supportsSessionDeletion(s.provider ?? "claude")),
     [selectedSessions]
   );
+  const resumableSessions = useMemo(
+    () =>
+      selectedSessions.filter((s) =>
+        supportsResumeCommandForSession(s.provider ?? "claude", s.entrypoint)
+      ),
+    [selectedSessions]
+  );
 
   const selectedCount = selectedSessions.length;
   const deletableCount = deletableSessions.length;
   const skippedCount = selectedCount - deletableCount;
+  const resumableCount = resumableSessions.length;
+  const resumeSkippedCount = selectedCount - resumableCount;
 
   const allVisibleSelected =
     visibleSessions.length > 0 &&
     visibleSessions.every((s) => idSet.has(s.session_id));
 
-  // Escape leaves selection mode, but only when the confirm dialog isn't
-  // open (there Escape closes the dialog) and no delete is in flight.
+  // Escape leaves selection mode, but only when a confirm dialog isn't
+  // open (there Escape closes the dialog) and no operation is in flight.
   useEffect(() => {
-    if (isDeleteDialogOpen || isDeleting) return;
+    if (isDeleteDialogOpen || isResumeDialogOpen || isDeleting || isResuming) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") exitSessionSelectionMode();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [isDeleteDialogOpen, isDeleting, exitSessionSelectionMode]);
+  }, [
+    isDeleteDialogOpen,
+    isResumeDialogOpen,
+    isDeleting,
+    isResuming,
+    exitSessionSelectionMode,
+  ]);
 
   const handleToggleAll = () => {
     if (allVisibleSelected) {
@@ -80,6 +110,13 @@ export const SessionSelectionBar: React.FC<SessionSelectionBarProps> = ({
         (s) => getSessionDisplayName(s.session_id, s.summary) || s.actual_session_id
       ),
     [deletableSessions, getSessionDisplayName]
+  );
+  const resumeNames = useMemo(
+    () =>
+      resumableSessions.map(
+        (s) => getSessionDisplayName(s.session_id, s.summary) || s.actual_session_id
+      ),
+    [resumableSessions, getSessionDisplayName]
   );
 
   const handleConfirmDelete = async () => {
@@ -97,6 +134,21 @@ export const SessionSelectionBar: React.FC<SessionSelectionBarProps> = ({
       });
     } finally {
       setIsDeleteDialogOpen(false);
+    }
+  };
+
+  const handleConfirmResume = async () => {
+    try {
+      await resumeSessions(resumableSessions, selectedProject?.actual_path);
+    } catch (error) {
+      const description =
+        error instanceof Error ? error.message : String(error);
+      console.error("[session selection] confirm resume failed", error);
+      toast.error(t("session.selection.resumeError", "Failed to open terminal"), {
+        description,
+      });
+    } finally {
+      setIsResumeDialogOpen(false);
     }
   };
 
@@ -144,11 +196,28 @@ export const SessionSelectionBar: React.FC<SessionSelectionBarProps> = ({
           <span>{t("session.selection.copyIds", "Copy IDs")}</span>
         </button>
 
+        {isDesktop && (
+          <button
+            type="button"
+            onClick={() => setIsResumeDialogOpen(true)}
+            disabled={resumableCount === 0}
+            className={cn(actionButtonClass, "ml-auto text-muted-foreground hover:bg-muted/50 hover:text-foreground")}
+          >
+            <SquareTerminal className="h-3 w-3" />
+            <span>
+              {t("session.selection.resume", {
+                count: resumableCount,
+                defaultValue: "Resume ({{count}})",
+              })}
+            </span>
+          </button>
+        )}
+
         <button
           type="button"
           onClick={() => setIsDeleteDialogOpen(true)}
           disabled={deletableCount === 0}
-          className={cn(actionButtonClass, "ml-auto text-destructive hover:bg-destructive/10")}
+          className={cn(actionButtonClass, "text-destructive hover:bg-destructive/10")}
         >
           <Trash2 className="h-3 w-3" />
           <span>
@@ -159,6 +228,19 @@ export const SessionSelectionBar: React.FC<SessionSelectionBarProps> = ({
           </span>
         </button>
       </div>
+
+      <SessionMultiResumeDialog
+        open={isResumeDialogOpen}
+        onOpenChange={(open) => {
+          if (isResuming) return;
+          setIsResumeDialogOpen(open);
+        }}
+        count={resumableCount}
+        skippedCount={resumeSkippedCount}
+        names={resumeNames}
+        isResuming={isResuming}
+        onConfirm={handleConfirmResume}
+      />
 
       <SessionMultiDeleteDialog
         open={isDeleteDialogOpen}

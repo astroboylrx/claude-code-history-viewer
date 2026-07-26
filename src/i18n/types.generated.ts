@@ -5,8 +5,8 @@
  * 직접 수정하지 마세요.
  *
  * 생성 명령: pnpm run generate:i18n-types
- * 생성 시간: 2026-07-19T02:12:41.381Z
- * 총 키 개수: 1791
+ * 생성 시간: 2026-07-26T07:10:39.449Z
+ * 총 키 개수: 1825
  * Namespace 수: 11
  */
 
@@ -410,7 +410,7 @@ export type AnalyticsKeys =
   | 'analytics.weeklyActivity';
 
 /**
- * session namespace의 번역 키 (197개)
+ * session namespace의 번역 키 (222개)
  * 파일: locales/{lang}/session.json
  */
 export type SessionKeys =
@@ -607,6 +607,31 @@ export type SessionKeys =
   | 'session.scanning'
   | 'session.select'
   | 'session.selectDescription'
+  | 'session.selection.clear'
+  | 'session.selection.copiedIds'
+  | 'session.selection.copyIds'
+  | 'session.selection.count'
+  | 'session.selection.delete'
+  | 'session.selection.deleteConfirmButton'
+  | 'session.selection.deleteMore'
+  | 'session.selection.deletePartial'
+  | 'session.selection.deleteSkipped'
+  | 'session.selection.deleteSuccess'
+  | 'session.selection.deleteTargets'
+  | 'session.selection.deleteTitle'
+  | 'session.selection.enter'
+  | 'session.selection.exit'
+  | 'session.selection.resume'
+  | 'session.selection.resumeConfirmButton'
+  | 'session.selection.resumeDescription'
+  | 'session.selection.resumeError'
+  | 'session.selection.resumeMore'
+  | 'session.selection.resumePartial'
+  | 'session.selection.resumeSkipped'
+  | 'session.selection.resumeSuccess'
+  | 'session.selection.resumeTargets'
+  | 'session.selection.resumeTitle'
+  | 'session.selection.selectAll'
   | 'session.showJsonlFile'
   | 'session.summaryNotFound'
   | 'session.syncError'
@@ -1871,7 +1896,7 @@ export type FeedbackKeys =
   | 'feedback.types.other';
 
 /**
- * recentEdits namespace의 번역 키 (20개)
+ * recentEdits namespace의 번역 키 (29개)
  * 파일: locales/{lang}/recentEdits.json
  */
 export type RecentEditsKeys =
@@ -1882,17 +1907,26 @@ export type RecentEditsKeys =
   | 'recentEdits.copyContent'
   | 'recentEdits.created'
   | 'recentEdits.description'
+  | 'recentEdits.diff'
   | 'recentEdits.edited'
   | 'recentEdits.footerInfo'
   | 'recentEdits.lines'
   | 'recentEdits.loading'
   | 'recentEdits.noEdits'
   | 'recentEdits.noEditsDescription'
+  | 'recentEdits.noLinesToShow'
   | 'recentEdits.noSearchResults'
   | 'recentEdits.restoreError'
   | 'recentEdits.restoreFile'
+  | 'recentEdits.revealError'
+  | 'recentEdits.revealInExplorer'
+  | 'recentEdits.revealInFinder'
+  | 'recentEdits.revealInFolder'
   | 'recentEdits.searchPlaceholder'
+  | 'recentEdits.showAddedLines'
+  | 'recentEdits.showDiff'
   | 'recentEdits.showMore'
+  | 'recentEdits.showRemovedLines'
   | 'recentEdits.stats'
   | 'recentEdits.title';
 
@@ -2704,17 +2738,26 @@ export type TranslationKey =
   | 'recentEdits.copyContent'
   | 'recentEdits.created'
   | 'recentEdits.description'
+  | 'recentEdits.diff'
   | 'recentEdits.edited'
   | 'recentEdits.footerInfo'
   | 'recentEdits.lines'
   | 'recentEdits.loading'
   | 'recentEdits.noEdits'
   | 'recentEdits.noEditsDescription'
+  | 'recentEdits.noLinesToShow'
   | 'recentEdits.noSearchResults'
   | 'recentEdits.restoreError'
   | 'recentEdits.restoreFile'
+  | 'recentEdits.revealError'
+  | 'recentEdits.revealInExplorer'
+  | 'recentEdits.revealInFinder'
+  | 'recentEdits.revealInFolder'
   | 'recentEdits.searchPlaceholder'
+  | 'recentEdits.showAddedLines'
+  | 'recentEdits.showDiff'
   | 'recentEdits.showMore'
+  | 'recentEdits.showRemovedLines'
   | 'recentEdits.stats'
   | 'recentEdits.title'
   | 'redactedThinkingRenderer.description'
@@ -2929,6 +2972,31 @@ export type TranslationKey =
   | 'session.scanning'
   | 'session.select'
   | 'session.selectDescription'
+  | 'session.selection.clear'
+  | 'session.selection.copiedIds'
+  | 'session.selection.copyIds'
+  | 'session.selection.count'
+  | 'session.selection.delete'
+  | 'session.selection.deleteConfirmButton'
+  | 'session.selection.deleteMore'
+  | 'session.selection.deletePartial'
+  | 'session.selection.deleteSkipped'
+  | 'session.selection.deleteSuccess'
+  | 'session.selection.deleteTargets'
+  | 'session.selection.deleteTitle'
+  | 'session.selection.enter'
+  | 'session.selection.exit'
+  | 'session.selection.resume'
+  | 'session.selection.resumeConfirmButton'
+  | 'session.selection.resumeDescription'
+  | 'session.selection.resumeError'
+  | 'session.selection.resumeMore'
+  | 'session.selection.resumePartial'
+  | 'session.selection.resumeSkipped'
+  | 'session.selection.resumeSuccess'
+  | 'session.selection.resumeTargets'
+  | 'session.selection.resumeTitle'
+  | 'session.selection.selectAll'
   | 'session.showJsonlFile'
   | 'session.summaryNotFound'
   | 'session.syncError'
