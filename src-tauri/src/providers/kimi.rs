@@ -694,6 +694,7 @@ fn load_messages_v2(wire_path: &Path) -> Result<Vec<ClaudeMessage>, String> {
             if let Some(alias) = raw.get("modelAlias").and_then(Value::as_str) {
                 kimi_model = Some(alias.to_string());
             }
+            continue;
         }
 
         // usage.record duplicates step.end data — skip to avoid double counting
@@ -767,6 +768,53 @@ fn load_messages_v2(wire_path: &Path) -> Result<Vec<ClaudeMessage>, String> {
                             _ => {}
                         }
                     }
+                }
+
+                // tool.call → create tool_use block (assistant message)
+                if evt_type == "tool.call" {
+                    let tool_name = event.get("name").and_then(Value::as_str).unwrap_or("unknown");
+                    let tool_id = event.get("toolCallId").and_then(Value::as_str).unwrap_or("unknown");
+                    let args = event.get("args").cloned().unwrap_or(Value::Null);
+                    let ts = base_timestamp
+                        .map(|t| timestamp_to_rfc3339(Some(t as f64)))
+                        .unwrap_or_else(|| Utc::now().to_rfc3339());
+
+                    counter += 1;
+                    let uuid = format!("kimi-{counter}");
+                    let content = serde_json::json!([{
+                        "type": "tool_use",
+                        "id": tool_id,
+                        "name": map_kimi_tool_name(tool_name),
+                        "input": args
+                    }]);
+                    messages.push(build_provider_message(
+                        "kimi", uuid, &session_id, ts, "assistant",
+                        Some("assistant"), Some(content), None,
+                    ));
+                }
+
+                // tool.result → create tool_result block (user message)
+                if evt_type == "tool.result" {
+                    let tool_id = event.get("toolCallId").and_then(Value::as_str).unwrap_or("unknown");
+                    let output = event.get("result")
+                        .and_then(|r| r.get("output"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("");
+                    let ts = base_timestamp
+                        .map(|t| timestamp_to_rfc3339(Some(t as f64)))
+                        .unwrap_or_else(|| Utc::now().to_rfc3339());
+
+                    counter += 1;
+                    let uuid = format!("kimi-{counter}");
+                    let content = serde_json::json!([{
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": output
+                    }]);
+                    messages.push(build_provider_message(
+                        "kimi", uuid, &session_id, ts, "user",
+                        Some("user"), Some(content), None,
+                    ));
                 }
             }
             continue;
